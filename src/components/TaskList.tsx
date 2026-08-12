@@ -10,6 +10,7 @@ import { Identity } from "../active";
 import { useReRenderOnDocProgress } from "../hooks";
 import { TaskList as TaskListDoc } from "../taskListDoc";
 import { copyToClipboard } from "../clipboard";
+import { log } from "../log";
 
 interface TaskListProps {
   docUrl: AutomergeUrl;
@@ -51,7 +52,7 @@ export const TaskList = ({
         if (!cancelled) setAccess(best);
       } catch (error) {
         if (!cancelled) {
-          console.error(`[Demo] Error checking access level: ${error}`);
+          log.error("Error checking access level:", error);
           setAccess(undefined);
         }
       } finally {

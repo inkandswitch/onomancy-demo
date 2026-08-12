@@ -14,11 +14,13 @@ import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-index
 import Frame from "./components/Frame.tsx";
 import { ensurePhonebook } from "./phonebook.ts";
 import * as syncServer from "./syncServer.ts";
+import { log, setDemoLogLevel, type DemoLogLevel } from "./log.ts";
 
 declare global {
   interface Window {
     hive: AutomergeRepoKeyhive;
     repo: Repo;
+    setDemoLogLevel: (level: DemoLogLevel) => void;
   }
 }
 
@@ -44,6 +46,7 @@ async function start() {
   // Debug handles.
   window.hive = hive;
   window.repo = repo;
+  window.setDemoLogLevel = setDemoLogLevel;
 
   // Seed the shared phonebook if the sync server does not already have it (for
   // example a freshly started server). Fire-and-forget: the UI renders now and
@@ -60,5 +63,5 @@ async function start() {
 }
 
 start().catch((error) => {
-  console.error("[Demo] Failed to start:", error);
+  log.error("Failed to start:", error);
 });

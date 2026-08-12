@@ -9,6 +9,7 @@ import {
 } from "@automerge/automerge-repo-keyhive";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import * as syncServer from "../syncServer";
+import { errorMessage, log } from "../log";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export function ShareModal({
   const [userIdInput, setUserIdInput] = useState("");
   const [selectedAccessLevel, setSelectedAccessLevel] = useState("Edit");
   const [members, setMembers] = useState<DocMember[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [isLoadingAccessList, setIsLoadingAccessList] = useState(true);
 
   // The current user and the public member are just entries in the member
@@ -73,10 +75,12 @@ export function ShareModal({
   }, [grantableNames, selectedAccessLevel]);
 
   const handleMakePublic = async () => {
+    setError(null);
     try {
       await hive.setPublicAccess(docUrl, Access.edit());
-    } catch (error) {
-      console.error("[Demo] Error making document public:", error);
+    } catch (err) {
+      log.error("Error making document public:", err);
+      setError(`Could not make the list public: ${errorMessage(err)}`);
     }
   };
 
@@ -84,10 +88,12 @@ export function ShareModal({
   // any other member is revoked.
   const handleMakePrivate = async () => {
     if (!publicMember) return;
+    setError(null);
     try {
       await hive.revokeMemberFromDoc(docUrl, publicMember.id);
-    } catch (error) {
-      console.error("[Demo] Error making document private:", error);
+    } catch (err) {
+      log.error("Error making document private:", err);
+      setError(`Could not make the list private: ${errorMessage(err)}`);
     }
   };
 
@@ -173,29 +179,36 @@ export function ShareModal({
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (userIdInput.trim()) {
-      try {
-        const contactCardString = userIdInput.trim();
-        // Validate JSON by parsing it
-        const contactCard = ContactCard.fromJson(contactCardString);
+    const contactCardJson = userIdInput.trim();
+    if (!contactCardJson) return;
 
-        // Throws on an unrecognized access level.
-        const access = Access.fromString(selectedAccessLevel);
-
-        await hive.addMemberToDoc(docUrl, contactCard, access);
-
-        setUserIdInput("");
-      } catch (error) {
-        console.error("[Demo] Error adding user:", error);
+    setError(null);
+    try {
+      const contactCard = ContactCard.fromJson(contactCardJson);
+      if (!contactCard) {
+        setError("Not a valid contact card.");
+        return;
       }
+
+      // Throws on an unrecognized access level.
+      const access = Access.fromString(selectedAccessLevel);
+
+      await hive.addMemberToDoc(docUrl, contactCard, access);
+
+      setUserIdInput("");
+    } catch (err) {
+      log.error("Error adding user:", err);
+      setError(`Could not share the list: ${errorMessage(err)}`);
     }
   };
 
   const handleRemoveUser = async (hexId: string) => {
+    setError(null);
     try {
       await hive.revokeMemberFromDoc(docUrl, hexId);
-    } catch (error) {
-      console.error("[Demo] Error removing user:", error);
+    } catch (err) {
+      log.error("Error removing user:", err);
+      setError(`Could not remove that member: ${errorMessage(err)}`);
     }
   };
 
@@ -275,6 +288,11 @@ export function ShareModal({
                 Add
               </button>
             </div>
+            {error && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {error}
+              </p>
+            )}
           </form>
 
           <div className="mb-6 flex items-center justify-between">

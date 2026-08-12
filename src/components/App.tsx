@@ -20,6 +20,7 @@ import {
   ContactCard,
 } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
+import { log } from "../log";
 
 type AppProps = {
   docUrl: AutomergeUrl;
@@ -40,7 +41,7 @@ class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error) {
-    console.error("[Demo] Caught error:", error);
+    log.error("Caught error:", error);
   }
 
   render() {
@@ -133,7 +134,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
         });
       })
       .catch((error) => {
-        console.error("[Demo] Could not load the sync server avatar:", error);
+        log.error("Could not load the sync server avatar:", error);
       });
   }, [phonebook, changePhonebook]);
 
