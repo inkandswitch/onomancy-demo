@@ -1,9 +1,10 @@
 import { AutomergeUrl, useDocument, updateText } from "@automerge/react/slim";
 import { ShareModal } from "./ShareModal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Access,
   AutomergeRepoKeyhive,
+  isUnprotectedDoc,
 } from "@automerge/automerge-repo-keyhive";
 import { Phonebook } from "../phonebook";
 import { Identity } from "../active";
@@ -36,9 +37,23 @@ export const TaskList = ({
   useReRenderOnDocProgress(docUrl);
   const [doc, changeDoc] = useDocument<TaskListDoc>(docUrl);
 
+  const isUnprotected = useMemo(() => {
+    try {
+      return isUnprotectedDoc(docUrl);
+    } catch {
+      return false;
+    }
+  }, [docUrl]);
+
   // Check access to this document. Recalculated when keyhive state changes.
   useEffect(() => {
     let cancelled = false;
+
+    if (isUnprotected) {
+      setAccess(undefined);
+      setAccessChecked(true);
+      return;
+    }
 
     async function fetchAccess() {
       try {
@@ -65,13 +80,19 @@ export const TaskList = ({
     return () => {
       cancelled = true;
     };
-  }, [keyhiveUpdateTracker, identity.active.individual.id, docUrl, hive]);
+  }, [
+    keyhiveUpdateTracker,
+    identity.active.individual.id,
+    docUrl,
+    hive,
+    isUnprotected,
+  ]);
 
-  const canRead = access?.isReader ?? false;
-  const canEdit = access?.isEditor ?? false;
+  const canRead = isUnprotected || (access?.isReader ?? false);
+  const canEdit = isUnprotected || (access?.isEditor ?? false);
   // Relay access doesn't allow you to delegate or revoke, so read access
   // is required to share a doc.
-  const canShare = canRead;
+  const canShare = !isUnprotected && canRead;
   const docId = docUrl.replace("automerge:", "");
 
   // Wait for the first access check, and for an accessible document to finish
@@ -123,6 +144,12 @@ export const TaskList = ({
       <div className="flex-1 overflow-y-auto flex justify-center items-start py-8">
         <div className="w-full max-w-2xl px-6">
           <div className="bg-background rounded-lg p-6 shadow-sm">
+            {isUnprotected && (
+              <div className="mb-6 rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                This document is{" "}
+                <span className="font-medium">unprotected</span>.
+              </div>
+            )}
             <div className="pb-6 mb-6">
               <div className="flex items-center gap-3 mb-6">
                 {canEdit ? (
