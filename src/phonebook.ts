@@ -9,7 +9,9 @@ import {
 export type Contact = {
   peerId: PeerId;
   name?: string;
-  avatar: Uint8Array | null;
+  // Optional: the sync server's entry carries an avatar but no name, since the
+  // UI labels it from ARK's DocMember.isSyncServer flag instead.
+  avatar?: Uint8Array | null;
 };
 
 // Maps hexId to Contact

@@ -70,7 +70,7 @@ export function UserModal({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    let newAvatar: Uint8Array | null = identityState.contact.avatar;
+    let newAvatar: Uint8Array | null = identityState.contact.avatar ?? null;
 
     if (avatarFile) {
       const arrayBuffer = await avatarFile.arrayBuffer();

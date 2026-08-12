@@ -18,9 +18,8 @@ import {
   AutomergeRepoKeyhive,
   uint8ArrayToHex,
   ContactCard,
-  KEYHIVE_SYNC_SERVER_CONTACT_CARD_JSON,
-  KEYHIVE_SYNC_SERVER_PEER_ID,
 } from "@automerge/automerge-repo-keyhive";
+import * as syncServer from "../syncServer";
 
 type AppProps = {
   docUrl: AutomergeUrl;
@@ -76,10 +75,10 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
     };
   }, [automergeRepoKeyhive.emitter, automergeRepoKeyhive.networkAdapter]);
 
-  // The phonebook is a shared doc that syncs in from the server (or is seeded
-  // locally on first run; see ensurePhonebook). Observe its load progress so
+  // The phonebook is a shared doc that syncs from the server (or is seeded
+  // locally on first run). Observe its load progress so
   // names and avatars (including the sync server's) appear once it arrives,
-  // without a page reload (see useReRenderOnDocProgress).
+  // without a page reload.
   useReRenderOnDocProgress(PHONEBOOK_URL);
   const [identityState, setIdentityState] = useState<Identity>(() => ({
     active: automergeRepoKeyhive.active,
@@ -110,30 +109,32 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
     }
   }, [phonebook, identityState.active.individual]);
 
-  // Add sync server to phonebook if not already there. The demo targets the
-  // canonical keyhive sync server identity (also used by the local dev
-  // server), so its contact card is a known constant.
+  // Give the sync server an avatar in the phonebook, so it is recognizable in
+  // the share dialog's member list. Derived from the configured server.
+  //
+  // Only the avatar is stored. The name comes from syncServer.DISPLAY_NAME at
+  // render time, because ARK already tells us which member is the sync server.
   useEffect(() => {
     if (!phonebook) return;
     const serverContactCard = ContactCard.fromJson(
-      KEYHIVE_SYNC_SERVER_CONTACT_CARD_JSON,
+      syncServer.CONTACT_CARD_JSON,
     );
     if (!serverContactCard) return;
     const serverHexId = uint8ArrayToHex(serverContactCard.individualId.bytes);
-    if (!phonebook[serverHexId]) {
-      // Load HAL avatar and add to phonebook
-      fetch(halAvatarUrl)
-        .then((res) => res.arrayBuffer())
-        .then((buffer) => {
-          changePhonebook((doc) => {
-            doc[serverHexId] = {
-              peerId: KEYHIVE_SYNC_SERVER_PEER_ID,
-              name: "Demo Sync Server",
-              avatar: new Uint8Array(buffer),
-            };
-          });
+    if (phonebook[serverHexId]) return;
+    fetch(halAvatarUrl)
+      .then((res) => res.arrayBuffer())
+      .then((buffer) => {
+        changePhonebook((doc) => {
+          doc[serverHexId] = {
+            peerId: syncServer.PEER_ID,
+            avatar: new Uint8Array(buffer),
+          };
         });
-    }
+      })
+      .catch((error) => {
+        console.error("[Demo] Could not load the sync server avatar:", error);
+      });
   }, [phonebook, changePhonebook]);
 
   const [hash, setHash] = useHash();

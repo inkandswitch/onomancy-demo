@@ -8,6 +8,7 @@ import {
   type DocMember,
 } from "@automerge/automerge-repo-keyhive";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
+import * as syncServer from "../syncServer";
 
 // Access levels from lowest to highest. You can share at your own level or below.
 const accessLevels = ["Relay", "Read", "Edit", "Admin"];
@@ -82,7 +83,7 @@ export function ShareModal({
   const displayNameFor = useCallback(
     (member: DocMember) => {
       if (member.isPublic) return "Public";
-      if (member.isSyncServer) return "Demo Sync Server";
+      if (member.isSyncServer) return syncServer.DISPLAY_NAME;
       return phonebook?.[member.id]?.name || `0x${member.id.slice(0, 12)}...`;
     },
     [phonebook],
