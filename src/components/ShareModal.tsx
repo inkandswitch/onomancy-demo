@@ -10,9 +10,6 @@ import {
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import * as syncServer from "../syncServer";
 
-// Access levels from lowest to highest. You can share at your own level or below.
-const accessLevels = ["Relay", "Read", "Edit", "Admin"];
-
 interface ShareModalProps {
   isOpen: boolean;
   docUrl: AutomergeUrl;
@@ -37,29 +34,43 @@ export function ShareModal({
 
   // The current user and the public member are just entries in the member
   // list, tagged by listMembers.
-  const currentUserAccess = members.find((m) => m.isSelf)?.access.toString();
+  const myAccess = members.find((m) => m.isSelf)?.access;
   const publicMember = members.find((m) => m.isPublic);
   const currentPublicAccess = publicMember?.access.toString();
 
-  const sharingOptions = useMemo(
-    () =>
-      currentUserAccess
-        ? accessLevels.filter(
-            (_, i) => i <= accessLevels.indexOf(currentUserAccess),
-          )
-        : [],
-    [currentUserAccess],
-  );
+  // Admin is the top of the ordering, so "can administer" is atLeast(admin).
+  // Built once rather than per render: these are WASM values.
+  const adminAccess = useMemo(() => Access.admin(), []);
+  const isAdmin = myAccess?.atLeast(adminAccess) ?? false;
 
-  // Reset selectedAccessLevel when sharingOptions changes
+  // You can grant your own access level or anything below it. Access values
+  // are ordered relay < read < edit < admin and know how to compare
+  // themselves, so the levels come from the API rather than from a list of
+  // names kept in step with it by hand.
+  const grantableLevels = useMemo(() => {
+    if (!myAccess) return [];
+    return [
+      Access.relay(),
+      Access.read(),
+      Access.edit(),
+      Access.admin(),
+    ].filter((level) => myAccess.atLeast(level));
+  }, [myAccess]);
+
+  // The <select> holds level names, since DOM values are strings. Keep it on
+  // a level the user can actually grant, defaulting to the highest.
+  const grantableNames = useMemo(
+    () => grantableLevels.map((level) => level.toString()),
+    [grantableLevels],
+  );
   useEffect(() => {
     if (
-      sharingOptions.length > 0 &&
-      !sharingOptions.includes(selectedAccessLevel)
+      grantableNames.length > 0 &&
+      !grantableNames.includes(selectedAccessLevel)
     ) {
-      setSelectedAccessLevel(sharingOptions[sharingOptions.length - 1]);
+      setSelectedAccessLevel(grantableNames[grantableNames.length - 1]);
     }
-  }, [sharingOptions, selectedAccessLevel]);
+  }, [grantableNames, selectedAccessLevel]);
 
   const handleMakePublic = async () => {
     try {
@@ -251,7 +262,7 @@ export function ShareModal({
                 onChange={(e) => setSelectedAccessLevel(e.target.value)}
                 className="px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm bg-background text-foreground"
               >
-                {sharingOptions.map((level) => (
+                {grantableNames.map((level) => (
                   <option key={level} value={level}>
                     {level.toUpperCase()}
                   </option>
@@ -279,7 +290,7 @@ export function ShareModal({
                 </>
               )}
             </p>
-            {currentUserAccess === "Admin" &&
+            {isAdmin &&
               (currentPublicAccess ? (
                 <button
                   onClick={handleMakePrivate}
@@ -337,29 +348,27 @@ export function ShareModal({
                           </div>
                         </div>
                       </div>
-                      {currentUserAccess === "Admin" &&
-                        !member.isSelf &&
-                        !member.isSyncServer && (
-                          <button
-                            onClick={() => handleRemoveUser(member.id)}
-                            className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                            aria-label="Remove user"
+                      {isAdmin && !member.isSelf && !member.isSyncServer && (
+                        <button
+                          onClick={() => handleRemoveUser(member.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                          aria-label="Remove user"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        )}
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })

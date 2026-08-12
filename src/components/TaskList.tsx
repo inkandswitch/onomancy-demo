@@ -1,7 +1,10 @@
 import { AutomergeUrl, useDocument, updateText } from "@automerge/react/slim";
 import { ShareModal } from "./ShareModal";
 import { useState, useEffect } from "react";
-import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
+import {
+  Access,
+  AutomergeRepoKeyhive,
+} from "@automerge/automerge-repo-keyhive";
 import { Phonebook } from "../phonebook";
 import { Identity } from "../active";
 import { useReRenderOnDocProgress } from "../hooks";
@@ -23,8 +26,7 @@ export const TaskList = ({
   keyhiveUpdateTracker,
 }: TaskListProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [shouldShowShareButton, setShouldShowShareButton] = useState(false);
-  const [userAccess, setUserAccess] = useState<string | undefined>(undefined);
+  const [access, setAccess] = useState<Access | undefined>(undefined);
   const [accessChecked, setAccessChecked] = useState(false);
 
   // Re-render when the document becomes available so a newly-granted doc
@@ -32,43 +34,24 @@ export const TaskList = ({
   useReRenderOnDocProgress(docUrl);
   const [doc, changeDoc] = useDocument<TaskListDoc>(docUrl);
 
-  // Check access level and update state. Recalculate when keyhive updates.
+  // Check access to this document. Recalculated when keyhive state changes.
   useEffect(() => {
     let cancelled = false;
 
     async function fetchAccess() {
-      const id = identity.active.individual.id;
-      // FIXME: This should probably be an error
-      if (!id) {
-        if (!cancelled) {
-          setShouldShowShareButton(false);
-          setUserAccess(undefined);
-          setAccessChecked(true);
-        }
-        return;
-      }
-
       try {
-        // Best of direct and public access (matches TPW's gate), so
-        // publicly-shared docs are readable by peers with no direct
-        // membership.
-        const access = await hive.bestAccessForDoc(id, docUrl);
-        if (cancelled) return;
-
-        if (access) {
-          setUserAccess(access.toString());
-          // Relay-only members sync ciphertext but cannot read, so there
-          // is nothing for them to share.
-          setShouldShowShareButton(access.isReader);
-        } else {
-          setUserAccess(undefined);
-          setShouldShowShareButton(false);
-        }
+        // The better of this identity's own membership and any public access,
+        // so a publicly-shared document is readable by a peer with no
+        // membership of its own.
+        const best = await hive.bestAccessForDoc(
+          identity.active.individual.id,
+          docUrl,
+        );
+        if (!cancelled) setAccess(best);
       } catch (error) {
         if (!cancelled) {
           console.error(`[Demo] Error checking access level: ${error}`);
-          setUserAccess(undefined);
-          setShouldShowShareButton(false);
+          setAccess(undefined);
         }
       } finally {
         if (!cancelled) setAccessChecked(true);
@@ -82,8 +65,11 @@ export const TaskList = ({
     };
   }, [keyhiveUpdateTracker, identity.active.individual.id, docUrl, hive]);
 
-  const canEdit = userAccess === "Edit" || userAccess === "Admin";
-  const canRead = canEdit || userAccess === "Read";
+  const canRead = access?.isReader ?? false;
+  const canEdit = access?.isEditor ?? false;
+  // Relay access doesn't allow you to delegate or revoke, so read access
+  // is required to share a doc.
+  const canShare = canRead;
   const docId = docUrl.replace("automerge:", "");
 
   // Wait for the first access check, and for an accessible document to finish
@@ -156,13 +142,11 @@ export const TaskList = ({
                 <button
                   type="button"
                   onClick={
-                    shouldShowShareButton
-                      ? () => setIsShareModalOpen(true)
-                      : undefined
+                    canShare ? () => setIsShareModalOpen(true) : undefined
                   }
-                  disabled={!shouldShowShareButton}
+                  disabled={!canShare}
                   className={`px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
-                    shouldShowShareButton
+                    canShare
                       ? "bg-secondary text-secondary-foreground border-border cursor-pointer hover:bg-accent hover:border-ring"
                       : "bg-muted text-muted-foreground border-muted cursor-not-allowed opacity-50"
                   }`}
