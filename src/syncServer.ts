@@ -25,7 +25,7 @@ export const ENDPOINT: string = __SYNC_SERVER__;
 // which the public keyhive sync server and a stock local subduction_cli dev
 // server both run.
 const isCustom = Boolean(
-  __SYNC_SERVER_CONTACT_CARD__ && __SYNC_SERVER_PEER_ID__,
+  __SYNC_SERVER_CONTACT_CARD__ && __SYNC_SERVER_PEER_ID__
 );
 
 // Passed to initializeAutomergeRepoKeyhive. ARK accepts either the name of an

@@ -9,6 +9,7 @@ import { Phonebook } from "../phonebook";
 import { Identity } from "../active";
 import { useReRenderOnDocProgress } from "../hooks";
 import { TaskList as TaskListDoc } from "../taskListDoc";
+import { copyToClipboard } from "../clipboard";
 
 interface TaskListProps {
   docUrl: AutomergeUrl;
@@ -45,7 +46,7 @@ export const TaskList = ({
         // membership of its own.
         const best = await hive.bestAccessForDoc(
           identity.active.individual.id,
-          docUrl,
+          docUrl
         );
         if (!cancelled) setAccess(best);
       } catch (error) {
@@ -58,7 +59,7 @@ export const TaskList = ({
       }
     }
 
-    fetchAccess();
+    void fetchAccess();
 
     return () => {
       cancelled = true;
@@ -96,7 +97,7 @@ export const TaskList = ({
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(docId);
+                      void copyToClipboard(docId);
                     }}
                     className="px-2 py-1 text-xs font-medium text-secondary-foreground bg-secondary border border-border rounded hover:bg-accent"
                   >
@@ -161,7 +162,7 @@ export const TaskList = ({
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(docId);
+                    void copyToClipboard(docId);
                   }}
                   className="px-2 py-1 text-xs font-medium text-secondary-foreground bg-secondary border border-border rounded hover:bg-accent"
                 >
@@ -179,7 +180,7 @@ export const TaskList = ({
                       d.tasks.unshift({
                         title: "",
                         done: false,
-                      }),
+                      })
                     );
                   }}
                   className="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium cursor-pointer hover:bg-accent hover:border-ring transition-colors"
@@ -218,7 +219,7 @@ export const TaskList = ({
                             updateText(
                               d,
                               ["tasks", index, "title"],
-                              e.target.value,
+                              e.target.value
                             );
                           })
                         }

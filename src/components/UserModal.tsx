@@ -3,6 +3,7 @@ import { Phonebook } from "../phonebook";
 import { Identity } from "../active";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import { uint8ArrayToHex } from "@automerge/automerge-repo-keyhive";
+import { copyToClipboard } from "../clipboard";
 
 interface UserModalProps {
   isOpen: boolean;
@@ -10,8 +11,7 @@ interface UserModalProps {
   identityState: Identity;
   setIdentityState: React.Dispatch<React.SetStateAction<Identity>>;
   changePhonebook:
-    | ((updater: (doc: Phonebook) => void | Error) => void)
-    | undefined;
+    ((updater: (doc: Phonebook) => void | Error) => void) | undefined;
 }
 
 export function UserModal({
@@ -28,7 +28,7 @@ export function UserModal({
   useEffect(() => {
     if (identityState.contact.avatar) {
       const url = URL.createObjectURL(
-        new Blob([identityState.contact.avatar as BlobPart]),
+        new Blob([identityState.contact.avatar as BlobPart])
       );
       setAvatarPreview(url);
       return () => URL.revokeObjectURL(url);
@@ -229,8 +229,8 @@ export function UserModal({
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard.writeText(
-                    identityState.active.contactCard.toJson(),
+                  void copyToClipboard(
+                    identityState.active.contactCard.toJson()
                   );
                 }}
                 className="mt-2 px-3 py-1.5 text-sm font-medium text-secondary-foreground bg-secondary border border-border rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"

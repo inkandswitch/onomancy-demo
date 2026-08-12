@@ -61,7 +61,7 @@ export function ShareModal({
   // a level the user can actually grant, defaulting to the highest.
   const grantableNames = useMemo(
     () => grantableLevels.map((level) => level.toString()),
-    [grantableLevels],
+    [grantableLevels]
   );
   useEffect(() => {
     if (
@@ -97,7 +97,7 @@ export function ShareModal({
       if (member.isSyncServer) return syncServer.DISPLAY_NAME;
       return phonebook?.[member.id]?.name || `0x${member.id.slice(0, 12)}...`;
     },
-    [phonebook],
+    [phonebook]
   );
 
   // Members sorted by display name. Memoized so an unrelated re-render does not
@@ -105,9 +105,9 @@ export function ShareModal({
   const sortedMembers = useMemo(
     () =>
       [...members].sort((a, b) =>
-        displayNameFor(a).localeCompare(displayNameFor(b)),
+        displayNameFor(a).localeCompare(displayNameFor(b))
       ),
-    [members, displayNameFor],
+    [members, displayNameFor]
   );
 
   // Build blob URLs for member avatars once per member/phonebook change, and
@@ -119,7 +119,7 @@ export function ShareModal({
       const avatar = phonebook?.[member.id]?.avatar;
       if (avatar) {
         urls[member.id] = URL.createObjectURL(
-          new Blob([new Uint8Array(avatar)]),
+          new Blob([new Uint8Array(avatar)])
         );
       }
     }
@@ -145,7 +145,7 @@ export function ShareModal({
     }
 
     if (isOpen) {
-      fetchMembers();
+      void fetchMembers();
     }
 
     return () => {

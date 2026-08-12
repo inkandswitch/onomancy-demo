@@ -93,7 +93,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
   useEffect(() => {
     if (phonebook && identityState.active.individual) {
       const userHexId = uint8ArrayToHex(
-        identityState.active.individual.id.toBytes(),
+        identityState.active.individual.id.toBytes()
       );
       const savedContact = phonebook[userHexId];
       if (savedContact) {
@@ -117,7 +117,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
   useEffect(() => {
     if (!phonebook) return;
     const serverContactCard = ContactCard.fromJson(
-      syncServer.CONTACT_CARD_JSON,
+      syncServer.CONTACT_CARD_JSON
     );
     if (!serverContactCard) return;
     const serverHexId = uint8ArrayToHex(serverContactCard.individualId.bytes);

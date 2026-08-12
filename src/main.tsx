@@ -8,6 +8,7 @@ import {
   initializeAutomergeRepoKeyhive,
   AutomergeRepoKeyhive,
 } from "@automerge/automerge-repo-keyhive";
+// eslint-disable-next-line automerge-slimport/enforce-automerge-slim-import
 import { Repo } from "@automerge/automerge-repo";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
 import Frame from "./components/Frame.tsx";

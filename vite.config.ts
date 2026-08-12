@@ -13,13 +13,13 @@ import { fileURLToPath } from "node:url";
 // ("expected instance of Topic/PeerId"). Same approach as the TPW vite
 // configs.
 const automergeEntryDir = dirname(
-  fileURLToPath(import.meta.resolve("@automerge/automerge")),
+  fileURLToPath(import.meta.resolve("@automerge/automerge"))
 );
 const subductionEsmDir = dirname(
-  fileURLToPath(import.meta.resolve("@automerge/automerge-subduction")),
+  fileURLToPath(import.meta.resolve("@automerge/automerge-subduction"))
 );
 const repoEntryDir = dirname(
-  fileURLToPath(import.meta.resolve("@automerge/automerge-repo")),
+  fileURLToPath(import.meta.resolve("@automerge/automerge-repo"))
 );
 
 // The document id of the shared phonebook, which holds every peer's name and
@@ -31,19 +31,19 @@ const phonebookDocId = process.env.PHONEBOOK_DOC_ID;
 if (!phonebookDocId) {
   throw new Error(
     "PHONEBOOK_DOC_ID is required. Generate one with `pnpm gen:phonebook-id`, " +
-      "then pass it in, e.g. PHONEBOOK_DOC_ID=automerge:... pnpm dev",
+      "then pass it in, e.g. PHONEBOOK_DOC_ID=automerge:... pnpm dev"
   );
 }
 if (
   !isValidAutomergeUrl(
     phonebookDocId.startsWith("automerge:")
       ? phonebookDocId
-      : `automerge:${phonebookDocId}`,
+      : `automerge:${phonebookDocId}`
   )
 ) {
   throw new Error(
     `PHONEBOOK_DOC_ID is not a valid Automerge document id: "${phonebookDocId}". ` +
-      "Generate one with `pnpm gen:phonebook-id`.",
+      "Generate one with `pnpm gen:phonebook-id`."
   );
 }
 
@@ -53,7 +53,7 @@ export default defineConfig({
     // server. Override with SYNC_SERVER, e.g. SYNC_SERVER=ws://localhost:3030
     // for a local dev server.
     __SYNC_SERVER__: JSON.stringify(
-      process.env.SYNC_SERVER || "wss://keyhive.sync.automerge.org",
+      process.env.SYNC_SERVER || "wss://keyhive.sync.automerge.org"
     ),
     // Sync server identity: its signed contact card JSON and its keyhive peer
     // id. Both must be set together, and they must match the identity the
@@ -61,10 +61,10 @@ export default defineConfig({
     // built-in "keyhive" identity, which the public keyhive sync server and a
     // stock local subduction_cli dev server both run.
     __SYNC_SERVER_CONTACT_CARD__: JSON.stringify(
-      process.env.SYNC_SERVER_CONTACT_CARD || "",
+      process.env.SYNC_SERVER_CONTACT_CARD || ""
     ),
     __SYNC_SERVER_PEER_ID__: JSON.stringify(
-      process.env.SYNC_SERVER_PEER_ID || "",
+      process.env.SYNC_SERVER_PEER_ID || ""
     ),
     __PHONEBOOK_DOC_ID__: JSON.stringify(phonebookDocId),
   },

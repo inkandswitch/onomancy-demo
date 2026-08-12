@@ -14,6 +14,6 @@ export function useReRenderOnDocProgress(docUrl: AutomergeUrl): void {
   const query = useMemo(() => repo.findWithProgress(docUrl), [repo, docUrl]);
   useSyncExternalStore(
     (onChange) => query.subscribe(onChange),
-    () => query.peek().state,
+    () => query.peek().state
   );
 }

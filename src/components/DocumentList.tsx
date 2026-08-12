@@ -176,5 +176,5 @@ const DocumentTitle: React.FC<{ docUrl: AutomergeUrl }> = React.memo(
 
     const title = doc.title || "Untitled Task List";
     return <span className="text-sm font-medium text-foreground">{title}</span>;
-  },
+  }
 );

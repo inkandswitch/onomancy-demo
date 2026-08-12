@@ -30,7 +30,7 @@ export const PHONEBOOK_URL: AutomergeUrl = (() => {
   if (!isValidAutomergeUrl(url)) {
     throw new Error(
       `PHONEBOOK_DOC_ID is not a valid Automerge document id: "${__PHONEBOOK_DOC_ID__}". ` +
-        "Generate one with `pnpm gen:phonebook-id`.",
+        "Generate one with `pnpm gen:phonebook-id`."
     );
   }
   return url;
