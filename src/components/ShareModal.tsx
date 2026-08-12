@@ -16,7 +16,7 @@ interface ShareModalProps {
   docUrl: AutomergeUrl;
   phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
-  keyhiveUpdateTracker: number;
+  keyhiveVersion: number;
   onClose: () => void;
 }
 
@@ -25,7 +25,7 @@ export function ShareModal({
   docUrl,
   phonebook,
   hive,
-  keyhiveUpdateTracker,
+  keyhiveVersion,
   onClose,
 }: ShareModalProps) {
   const [userIdInput, setUserIdInput] = useState("");
@@ -157,7 +157,7 @@ export function ShareModal({
     return () => {
       cancelled = true;
     };
-  }, [keyhiveUpdateTracker, docUrl, hive, isOpen]);
+  }, [keyhiveVersion, docUrl, hive, isOpen]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

@@ -18,7 +18,7 @@ interface TaskListProps {
   phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
   identity: Identity;
-  keyhiveUpdateTracker: number;
+  keyhiveVersion: number;
 }
 
 export const TaskList = ({
@@ -26,7 +26,7 @@ export const TaskList = ({
   phonebook,
   hive,
   identity,
-  keyhiveUpdateTracker,
+  keyhiveVersion,
 }: TaskListProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [access, setAccess] = useState<Access | undefined>(undefined);
@@ -81,7 +81,7 @@ export const TaskList = ({
       cancelled = true;
     };
   }, [
-    keyhiveUpdateTracker,
+    keyhiveVersion,
     identity.active.individual.id,
     docUrl,
     hive,
@@ -279,7 +279,7 @@ export const TaskList = ({
         docUrl={docUrl}
         phonebook={phonebook}
         hive={hive}
-        keyhiveUpdateTracker={keyhiveUpdateTracker}
+        keyhiveVersion={keyhiveVersion}
         onClose={() => setIsShareModalOpen(false)}
       />
     </div>

@@ -10,10 +10,10 @@ import { DocumentList } from "./DocumentList";
 import { useHash } from "react-use";
 import { AvatarIcon } from "./AvatarIcon";
 import { UserModal } from "./UserModal";
-import { useState, useEffect, Component, type ReactNode } from "react";
+import { useState, useEffect } from "react";
 import { Phonebook, PHONEBOOK_URL } from "../phonebook";
 import { Identity } from "../active";
-import { useReRenderOnDocProgress } from "../hooks";
+import { useKeyhiveUpdates, useReRenderOnDocProgress } from "../hooks";
 import {
   AutomergeRepoKeyhive,
   uint8ArrayToHex,
@@ -21,60 +21,15 @@ import {
 } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
 import { log } from "../log";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 type AppProps = {
   docUrl: AutomergeUrl;
   automergeRepoKeyhive: AutomergeRepoKeyhive;
 };
 
-class ErrorBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    log.error("Caught error:", error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return null;
-    }
-    return this.props.children;
-  }
-}
-
 function App({ docUrl, automergeRepoKeyhive }: AppProps) {
-  const [keyhiveUpdateTracker, setKeyhiveUpdateTracker] = useState(0);
-
-  // Watch for keyhive updates - debounced to avoid excessive re-renders
-  useEffect(() => {
-    let timeoutId: number;
-    const handler = () => {
-      clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        setKeyhiveUpdateTracker((v) => v + 1);
-      }, 100);
-    };
-
-    // "update" fires for locally-originated keyhive changes; remote ops
-    // arriving over sync signal "ingest-remote" on the network adapter.
-    automergeRepoKeyhive.emitter.on("update", handler);
-    automergeRepoKeyhive.networkAdapter.on("ingest-remote", handler);
-    return () => {
-      clearTimeout(timeoutId);
-      automergeRepoKeyhive.emitter.off("update", handler);
-      automergeRepoKeyhive.networkAdapter.off("ingest-remote", handler);
-    };
-  }, [automergeRepoKeyhive.emitter, automergeRepoKeyhive.networkAdapter]);
+  const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
 
   // The phonebook is a shared doc that syncs from the server (or is seeded
   // locally on first run). Observe its load progress so
@@ -190,7 +145,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
                 phonebook={phonebook}
                 hive={automergeRepoKeyhive}
                 identity={identityState}
-                keyhiveUpdateTracker={keyhiveUpdateTracker}
+                keyhiveVersion={keyhiveVersion}
               />
             </ErrorBoundary>
           ) : (
