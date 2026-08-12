@@ -12,10 +12,6 @@ import {
   uint8ArrayToHex,
 } from "@automerge/automerge-repo-keyhive";
 
-export interface TemporaryAccountInterface {
-  rootFolderUrl: AutomergeUrl;
-}
-
 export default function Frame({
   automergeRepoKeyhive,
   repo,

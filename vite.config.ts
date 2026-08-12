@@ -7,11 +7,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Force a single copy of the automerge and subduction modules, resolved from
-// this project's node_modules. The linked automerge-repo-keyhive package has
-// its own node_modules, and a duplicate copy of a WASM-backed module is a
-// separate module instance, which breaks wasm-bindgen instanceof checks
-// ("expected instance of Topic/PeerId"). Same approach as the TPW vite
-// configs.
+// this project's node_modules. `automerge-repo-keyhive` brings its own copies,
+// and a duplicate of a WASM-backed module is a separate module instance, which
+// breaks wasm-bindgen instanceof checks ("expected instance of Topic/PeerId").
+// pnpm-workspace.yaml pins the same packages at install time.
 const automergeEntryDir = dirname(
   fileURLToPath(import.meta.resolve("@automerge/automerge"))
 );
@@ -24,7 +23,7 @@ const repoEntryDir = dirname(
 
 // The document id of the shared phonebook, which holds every peer's name and
 // avatar. It is required rather than hardcoded so that each deployment of the
-// demo has its own phonebook, shared only with the people it hands the id to.
+// demo has its own phonebook, shared only with the people it shares the id with.
 // The phonebook is unencrypted and unprotected, so anyone who knows the id can
 // read and write it.
 const phonebookDocId = process.env.PHONEBOOK_DOC_ID;
