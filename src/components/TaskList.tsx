@@ -13,6 +13,12 @@ import { TaskList as TaskListDoc } from "../taskListDoc";
 import { copyToClipboard } from "../clipboard";
 import { log } from "../log";
 
+function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.equals(b);
+}
+
 interface TaskListProps {
   docUrl: AutomergeUrl;
   phonebook: Phonebook | undefined;
@@ -64,7 +70,11 @@ export const TaskList = ({
           identity.active.individual.id,
           docUrl
         );
-        if (!cancelled) setAccess(best);
+        // Store a new Access only when it actually differs. Every call returns
+        // a fresh object, so setting it unconditionally would re-render on
+        // every check, re-run this effect, and never settle.
+        if (!cancelled)
+          setAccess((prev) => (sameAccess(prev, best) ? prev : best));
       } catch (error) {
         if (!cancelled) {
           log.error("Error checking access level:", error);
@@ -80,13 +90,7 @@ export const TaskList = ({
     return () => {
       cancelled = true;
     };
-  }, [
-    keyhiveVersion,
-    identity.active.individual.id,
-    docUrl,
-    hive,
-    isUnprotected,
-  ]);
+  }, [keyhiveVersion, identity.active.individual, docUrl, hive, isUnprotected]);
 
   const canRead = isUnprotected || (access?.isReader ?? false);
   const canEdit = isUnprotected || (access?.isEditor ?? false);
