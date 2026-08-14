@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Local configuration: PHONEBOOK_DOC_ID and any sync server overrides.
+.env
+.env.*
+!.env.example
 .vite
 
 # Editor directories and files
