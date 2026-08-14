@@ -6,7 +6,6 @@ import { uint8ArrayToHex } from "@automerge/automerge-repo-keyhive";
 import { copyToClipboard } from "../clipboard";
 
 interface UserModalProps {
-  isOpen: boolean;
   onClose: () => void;
   identityState: Identity;
   setIdentityState: React.Dispatch<React.SetStateAction<Identity>>;
@@ -15,7 +14,6 @@ interface UserModalProps {
 }
 
 export function UserModal({
-  isOpen,
   onClose,
   identityState,
   setIdentityState,
@@ -39,21 +37,19 @@ export function UserModal({
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     };
 
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
-    }
+    document.addEventListener("keydown", handleEscape);
+    document.body.style.overflow = "hidden";
 
     return () => {
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, onClose]);
+  }, [onClose]);
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -119,21 +115,19 @@ export function UserModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
     <div
       className="fixed inset-0 z-50 overflow-auto bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 transition-all duration-200"
       onClick={handleBackdropClick}
       style={{
-        animation: isOpen ? "fadeIn 0.2s ease-out" : undefined,
+        animation: "fadeIn 0.2s ease-out",
       }}
     >
       <div
         className="bg-card rounded-lg shadow-lg border border-border max-w-md w-full max-h-[90vh] overflow-auto transition-all duration-200 transform ring-1 ring-ring/20 ring-offset-2 ring-offset-background"
         onClick={(e) => e.stopPropagation()}
         style={{
-          animation: isOpen ? "slideIn 0.2s ease-out" : undefined,
+          animation: "slideIn 0.2s ease-out",
         }}
       >
         <div className="p-6">

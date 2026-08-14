@@ -155,13 +155,14 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
           )}
         </div>
       </div>
-      <UserModal
-        isOpen={isUserModalOpen}
-        onClose={() => setIsUserModalOpen(false)}
-        identityState={identityState}
-        setIdentityState={setIdentityState}
-        changePhonebook={changePhonebook}
-      />
+      {isUserModalOpen && (
+        <UserModal
+          onClose={() => setIsUserModalOpen(false)}
+          identityState={identityState}
+          setIdentityState={setIdentityState}
+          changePhonebook={changePhonebook}
+        />
+      )}
     </div>
   );
 }
