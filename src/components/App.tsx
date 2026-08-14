@@ -18,6 +18,7 @@ import {
   AutomergeRepoKeyhive,
   uint8ArrayToHex,
   ContactCard,
+  verifyingKeyPeerIdWithoutSuffix,
 } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
 import { log } from "../log";
@@ -39,7 +40,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
   const [identityState, setIdentityState] = useState<Identity>(() => ({
     active: automergeRepoKeyhive.active,
     contact: {
-      peerId: automergeRepoKeyhive.active.peerId,
+      peerId: verifyingKeyPeerIdWithoutSuffix(automergeRepoKeyhive.peerId),
       avatar: null,
     },
   }));
