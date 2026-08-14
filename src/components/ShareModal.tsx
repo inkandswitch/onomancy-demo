@@ -8,16 +8,15 @@ import {
   type DocMember,
 } from "@automerge/automerge-repo-keyhive";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
-
-// Access levels from lowest to highest. You can share at your own level or below.
-const accessLevels = ["Relay", "Read", "Edit", "Admin"];
+import * as syncServer from "../syncServer";
+import { errorMessage, log } from "../log";
 
 interface ShareModalProps {
   isOpen: boolean;
   docUrl: AutomergeUrl;
   phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
-  keyhiveUpdateTracker: number;
+  keyhiveVersion: number;
   onClose: () => void;
 }
 
@@ -26,45 +25,62 @@ export function ShareModal({
   docUrl,
   phonebook,
   hive,
-  keyhiveUpdateTracker,
+  keyhiveVersion,
   onClose,
 }: ShareModalProps) {
   const [userIdInput, setUserIdInput] = useState("");
   const [selectedAccessLevel, setSelectedAccessLevel] = useState("Edit");
   const [members, setMembers] = useState<DocMember[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [isLoadingAccessList, setIsLoadingAccessList] = useState(true);
 
   // The current user and the public member are just entries in the member
   // list, tagged by listMembers.
-  const currentUserAccess = members.find((m) => m.isSelf)?.access.toString();
+  const myAccess = members.find((m) => m.isSelf)?.access;
   const publicMember = members.find((m) => m.isPublic);
   const currentPublicAccess = publicMember?.access.toString();
 
-  const sharingOptions = useMemo(
-    () =>
-      currentUserAccess
-        ? accessLevels.filter(
-            (_, i) => i <= accessLevels.indexOf(currentUserAccess),
-          )
-        : [],
-    [currentUserAccess],
-  );
+  // Admin is the top of the ordering, so "can administer" is atLeast(admin).
+  // Built once rather than per render: these are WASM values.
+  const adminAccess = useMemo(() => Access.admin(), []);
+  const isAdmin = myAccess?.atLeast(adminAccess) ?? false;
 
-  // Reset selectedAccessLevel when sharingOptions changes
+  // You can grant your own access level or anything below it. Access values
+  // are ordered relay < read < edit < admin and know how to compare
+  // themselves, so the levels come from the API rather than from a list of
+  // names kept in step with it by hand.
+  const grantableLevels = useMemo(() => {
+    if (!myAccess) return [];
+    return [
+      Access.relay(),
+      Access.read(),
+      Access.edit(),
+      Access.admin(),
+    ].filter((level) => myAccess.atLeast(level));
+  }, [myAccess]);
+
+  // The <select> holds level names, since DOM values are strings. Keep it on
+  // a level the user can actually grant, defaulting to the highest.
+  const grantableNames = useMemo(
+    () => grantableLevels.map((level) => level.toString()),
+    [grantableLevels]
+  );
   useEffect(() => {
     if (
-      sharingOptions.length > 0 &&
-      !sharingOptions.includes(selectedAccessLevel)
+      grantableNames.length > 0 &&
+      !grantableNames.includes(selectedAccessLevel)
     ) {
-      setSelectedAccessLevel(sharingOptions[sharingOptions.length - 1]);
+      setSelectedAccessLevel(grantableNames[grantableNames.length - 1]);
     }
-  }, [sharingOptions, selectedAccessLevel]);
+  }, [grantableNames, selectedAccessLevel]);
 
   const handleMakePublic = async () => {
+    setError(null);
     try {
       await hive.setPublicAccess(docUrl, Access.edit());
-    } catch (error) {
-      console.error("[Demo] Error making document public:", error);
+    } catch (err) {
+      log.error("Error making document public:", err);
+      setError(`Could not make the list public: ${errorMessage(err)}`);
     }
   };
 
@@ -72,20 +88,22 @@ export function ShareModal({
   // any other member is revoked.
   const handleMakePrivate = async () => {
     if (!publicMember) return;
+    setError(null);
     try {
       await hive.revokeMemberFromDoc(docUrl, publicMember.id);
-    } catch (error) {
-      console.error("[Demo] Error making document private:", error);
+    } catch (err) {
+      log.error("Error making document private:", err);
+      setError(`Could not make the list private: ${errorMessage(err)}`);
     }
   };
 
   const displayNameFor = useCallback(
     (member: DocMember) => {
       if (member.isPublic) return "Public";
-      if (member.isSyncServer) return "Demo Sync Server";
+      if (member.isSyncServer) return syncServer.DISPLAY_NAME;
       return phonebook?.[member.id]?.name || `0x${member.id.slice(0, 12)}...`;
     },
-    [phonebook],
+    [phonebook]
   );
 
   // Members sorted by display name. Memoized so an unrelated re-render does not
@@ -93,9 +111,9 @@ export function ShareModal({
   const sortedMembers = useMemo(
     () =>
       [...members].sort((a, b) =>
-        displayNameFor(a).localeCompare(displayNameFor(b)),
+        displayNameFor(a).localeCompare(displayNameFor(b))
       ),
-    [members, displayNameFor],
+    [members, displayNameFor]
   );
 
   // Build blob URLs for member avatars once per member/phonebook change, and
@@ -107,7 +125,7 @@ export function ShareModal({
       const avatar = phonebook?.[member.id]?.avatar;
       if (avatar) {
         urls[member.id] = URL.createObjectURL(
-          new Blob([new Uint8Array(avatar)]),
+          new Blob([new Uint8Array(avatar)])
         );
       }
     }
@@ -133,13 +151,13 @@ export function ShareModal({
     }
 
     if (isOpen) {
-      fetchMembers();
+      void fetchMembers();
     }
 
     return () => {
       cancelled = true;
     };
-  }, [keyhiveUpdateTracker, docUrl, hive, isOpen]);
+  }, [keyhiveVersion, docUrl, hive, isOpen]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -161,29 +179,36 @@ export function ShareModal({
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (userIdInput.trim()) {
-      try {
-        const contactCardString = userIdInput.trim();
-        // Validate JSON by parsing it
-        const contactCard = ContactCard.fromJson(contactCardString);
+    const contactCardJson = userIdInput.trim();
+    if (!contactCardJson) return;
 
-        // Throws on an unrecognized access level.
-        const access = Access.fromString(selectedAccessLevel);
-
-        await hive.addMemberToDoc(docUrl, contactCard, access);
-
-        setUserIdInput("");
-      } catch (error) {
-        console.error("[Demo] Error adding user:", error);
+    setError(null);
+    try {
+      const contactCard = ContactCard.fromJson(contactCardJson);
+      if (!contactCard) {
+        setError("Not a valid contact card.");
+        return;
       }
+
+      // Throws on an unrecognized access level.
+      const access = Access.fromString(selectedAccessLevel);
+
+      await hive.addMemberToDoc(docUrl, contactCard, access);
+
+      setUserIdInput("");
+    } catch (err) {
+      log.error("Error adding user:", err);
+      setError(`Could not share the list: ${errorMessage(err)}`);
     }
   };
 
   const handleRemoveUser = async (hexId: string) => {
+    setError(null);
     try {
       await hive.revokeMemberFromDoc(docUrl, hexId);
-    } catch (error) {
-      console.error("[Demo] Error removing user:", error);
+    } catch (err) {
+      log.error("Error removing user:", err);
+      setError(`Could not remove that member: ${errorMessage(err)}`);
     }
   };
 
@@ -250,7 +275,7 @@ export function ShareModal({
                 onChange={(e) => setSelectedAccessLevel(e.target.value)}
                 className="px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm bg-background text-foreground"
               >
-                {sharingOptions.map((level) => (
+                {grantableNames.map((level) => (
                   <option key={level} value={level}>
                     {level.toUpperCase()}
                   </option>
@@ -263,6 +288,11 @@ export function ShareModal({
                 Add
               </button>
             </div>
+            {error && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {error}
+              </p>
+            )}
           </form>
 
           <div className="mb-6 flex items-center justify-between">
@@ -278,7 +308,7 @@ export function ShareModal({
                 </>
               )}
             </p>
-            {currentUserAccess === "Admin" &&
+            {isAdmin &&
               (currentPublicAccess ? (
                 <button
                   onClick={handleMakePrivate}
@@ -336,29 +366,27 @@ export function ShareModal({
                           </div>
                         </div>
                       </div>
-                      {currentUserAccess === "Admin" &&
-                        !member.isSelf &&
-                        !member.isSyncServer && (
-                          <button
-                            onClick={() => handleRemoveUser(member.id)}
-                            className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                            aria-label="Remove user"
+                      {isAdmin && !member.isSelf && !member.isSyncServer && (
+                        <button
+                          onClick={() => handleRemoveUser(member.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                          aria-label="Remove user"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        )}
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })

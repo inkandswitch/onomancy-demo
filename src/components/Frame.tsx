@@ -12,10 +12,6 @@ import {
   uint8ArrayToHex,
 } from "@automerge/automerge-repo-keyhive";
 
-export interface TemporaryAccountInterface {
-  rootFolderUrl: AutomergeUrl;
-}
-
 export default function Frame({
   automergeRepoKeyhive,
   repo,
@@ -30,15 +26,13 @@ export default function Frame({
   );
 }
 
-function FrameInner(props: {
-  automergeRepoKeyhive: AutomergeRepoKeyhive;
-}) {
+function FrameInner(props: { automergeRepoKeyhive: AutomergeRepoKeyhive }) {
   const repo = useRepo();
   const [rootDocUrl, setRootDocUrl] = useState<AutomergeUrl | null>(null);
 
   useEffect(() => {
     const identityId = uint8ArrayToHex(
-      props.automergeRepoKeyhive.active.individual.id.toBytes(),
+      props.automergeRepoKeyhive.active.individual.id.toBytes()
     );
     const storageKey = `keyhive-demo-root-${identityId}`;
     const existingUrl = localStorage.getItem(storageKey);

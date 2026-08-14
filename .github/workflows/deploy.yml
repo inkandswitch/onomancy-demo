@@ -1,4 +1,11 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Deploys the built demo to GitHub Pages.
+#
+# The build needs a phonebook document id. It is deployment-specific rather
+# than hardcoded (see "Phonebook configuration" in the README), so set it as a
+# repository variable named PHONEBOOK_DOC_ID under
+# Settings > Secrets and variables > Actions > Variables. Generate a value with
+# `pnpm gen:phonebook-id`. It is not a secret: the id is visible in the built
+# bundle, and the phonebook it names is unencrypted by design.
 name: Deploy static content to Pages
 
 on:
@@ -30,15 +37,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      # Before setup-node, so its pnpm cache lookup can find the store.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+          version: "10"
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "npm"
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Install dependencies
-        run: yarn
+        run: pnpm install --frozen-lockfile
+      - name: Check PHONEBOOK_DOC_ID is configured
+        if: vars.PHONEBOOK_DOC_ID == ''
+        run: |
+          echo "::error::PHONEBOOK_DOC_ID repository variable is not set." \
+            "Generate one with 'pnpm gen:phonebook-id' and add it under" \
+            "Settings > Secrets and variables > Actions > Variables."
+          exit 1
       - name: Build
-        run: yarn build
+        run: pnpm build
+        env:
+          PHONEBOOK_DOC_ID: ${{ vars.PHONEBOOK_DOC_ID }}
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact

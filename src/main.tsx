@@ -7,38 +7,22 @@ import "@automerge/automerge-subduction";
 import {
   initializeAutomergeRepoKeyhive,
   AutomergeRepoKeyhive,
-  type SyncServerSelection,
 } from "@automerge/automerge-repo-keyhive";
+// eslint-disable-next-line automerge-slimport/enforce-automerge-slim-import
 import { Repo } from "@automerge/automerge-repo";
-import { PeerId } from "@automerge/automerge-repo/slim";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
 import Frame from "./components/Frame.tsx";
 import { ensurePhonebook } from "./phonebook.ts";
+import * as syncServer from "./syncServer.ts";
+import { log, setDemoLogLevel, type DemoLogLevel } from "./log.ts";
 
 declare global {
   interface Window {
     hive: AutomergeRepoKeyhive;
     repo: Repo;
+    setDemoLogLevel: (level: DemoLogLevel) => void;
   }
-  const __SYNC_SERVER__: string;
-  const __SYNC_SERVER_CONTACT_CARD__: string;
-  const __SYNC_SERVER_PEER_ID__: string;
-  const __PHONEBOOK_DOC_ID__: string;
 }
-
-// The identity to register as the sync server relay. When a custom contact
-// card and peer id are supplied (via the SYNC_SERVER_CONTACT_CARD and
-// SYNC_SERVER_PEER_ID build vars) the demo targets that server. Otherwise it
-// uses the built-in "keyhive" identity, which the public keyhive sync server
-// and a stock local subduction_cli dev server both run. The identity must
-// match whatever server __SYNC_SERVER__ points at.
-const syncServer: SyncServerSelection =
-  __SYNC_SERVER_CONTACT_CARD__ && __SYNC_SERVER_PEER_ID__
-    ? {
-        contactCardJson: __SYNC_SERVER_CONTACT_CARD__,
-        peerId: __SYNC_SERVER_PEER_ID__ as PeerId,
-      }
-    : "keyhive";
 
 async function start() {
   const storage = new IndexedDBStorageAdapter();
@@ -51,16 +35,18 @@ async function start() {
     peerIdSuffix: "keyhive-demo",
     automaticArchiveIngestion: true,
     cachingMode: "periodic",
-    syncServer,
+    syncServer: syncServer.SELECTION,
     repo: {
       storage,
-      subductionWebsocketEndpoints: [__SYNC_SERVER__],
+      subductionWebsocketEndpoints: [syncServer.ENDPOINT],
       enableRemoteHeadsGossiping: true,
     },
   });
 
+  // Debug handles.
   window.hive = hive;
   window.repo = repo;
+  window.setDemoLogLevel = setDemoLogLevel;
 
   // Seed the shared phonebook if the sync server does not already have it (for
   // example a freshly started server). Fire-and-forget: the UI renders now and
@@ -77,5 +63,5 @@ async function start() {
 }
 
 start().catch((error) => {
-  console.error("[Demo] Failed to start:", error);
+  log.error("Failed to start:", error);
 });

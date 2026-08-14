@@ -1,18 +1,30 @@
 import { AutomergeUrl, useDocument, updateText } from "@automerge/react/slim";
 import { ShareModal } from "./ShareModal";
-import { useState, useEffect } from "react";
-import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
+import { useState, useEffect, useMemo } from "react";
+import {
+  Access,
+  AutomergeRepoKeyhive,
+  isUnprotectedDoc,
+} from "@automerge/automerge-repo-keyhive";
 import { Phonebook } from "../phonebook";
 import { Identity } from "../active";
 import { useReRenderOnDocProgress } from "../hooks";
 import { TaskList as TaskListDoc } from "../taskListDoc";
+import { copyToClipboard } from "../clipboard";
+import { log } from "../log";
+
+function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.equals(b);
+}
 
 interface TaskListProps {
   docUrl: AutomergeUrl;
   phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
   identity: Identity;
-  keyhiveUpdateTracker: number;
+  keyhiveVersion: number;
 }
 
 export const TaskList = ({
@@ -20,11 +32,10 @@ export const TaskList = ({
   phonebook,
   hive,
   identity,
-  keyhiveUpdateTracker,
+  keyhiveVersion,
 }: TaskListProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [shouldShowShareButton, setShouldShowShareButton] = useState(false);
-  const [userAccess, setUserAccess] = useState<string | undefined>(undefined);
+  const [access, setAccess] = useState<Access | undefined>(undefined);
   const [accessChecked, setAccessChecked] = useState(false);
 
   // Re-render when the document becomes available so a newly-granted doc
@@ -32,58 +43,60 @@ export const TaskList = ({
   useReRenderOnDocProgress(docUrl);
   const [doc, changeDoc] = useDocument<TaskListDoc>(docUrl);
 
-  // Check access level and update state. Recalculate when keyhive updates.
+  const isUnprotected = useMemo(() => {
+    try {
+      return isUnprotectedDoc(docUrl);
+    } catch {
+      return false;
+    }
+  }, [docUrl]);
+
+  // Check access to this document. Recalculated when keyhive state changes.
   useEffect(() => {
     let cancelled = false;
 
+    if (isUnprotected) {
+      setAccess(undefined);
+      setAccessChecked(true);
+      return;
+    }
+
     async function fetchAccess() {
-      const id = identity.active.individual.id;
-      // FIXME: This should probably be an error
-      if (!id) {
-        if (!cancelled) {
-          setShouldShowShareButton(false);
-          setUserAccess(undefined);
-          setAccessChecked(true);
-        }
-        return;
-      }
-
       try {
-        // Best of direct and public access (matches TPW's gate), so
-        // publicly-shared docs are readable by peers with no direct
-        // membership.
-        const access = await hive.bestAccessForDoc(id, docUrl);
-        if (cancelled) return;
-
-        if (access) {
-          setUserAccess(access.toString());
-          // Relay-only members sync ciphertext but cannot read, so there
-          // is nothing for them to share.
-          setShouldShowShareButton(access.isReader);
-        } else {
-          setUserAccess(undefined);
-          setShouldShowShareButton(false);
-        }
+        // The better of this identity's own membership and any public access,
+        // so a publicly-shared document is readable by a peer with no
+        // membership of its own.
+        const best = await hive.bestAccessForDoc(
+          identity.active.individual.id,
+          docUrl
+        );
+        // Store a new Access only when it actually differs. Every call returns
+        // a fresh object, so setting it unconditionally would re-render on
+        // every check, re-run this effect, and never settle.
+        if (!cancelled)
+          setAccess((prev) => (sameAccess(prev, best) ? prev : best));
       } catch (error) {
         if (!cancelled) {
-          console.error(`[Demo] Error checking access level: ${error}`);
-          setUserAccess(undefined);
-          setShouldShowShareButton(false);
+          log.error("Error checking access level:", error);
+          setAccess(undefined);
         }
       } finally {
         if (!cancelled) setAccessChecked(true);
       }
     }
 
-    fetchAccess();
+    void fetchAccess();
 
     return () => {
       cancelled = true;
     };
-  }, [keyhiveUpdateTracker, identity.active.individual.id, docUrl, hive]);
+  }, [keyhiveVersion, identity.active.individual, docUrl, hive, isUnprotected]);
 
-  const canEdit = userAccess === "Edit" || userAccess === "Admin";
-  const canRead = canEdit || userAccess === "Read";
+  const canRead = isUnprotected || (access?.isReader ?? false);
+  const canEdit = isUnprotected || (access?.isEditor ?? false);
+  // Relay access doesn't allow you to delegate or revoke, so read access
+  // is required to share a doc.
+  const canShare = !isUnprotected && canRead;
   const docId = docUrl.replace("automerge:", "");
 
   // Wait for the first access check, and for an accessible document to finish
@@ -110,7 +123,7 @@ export const TaskList = ({
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(docId);
+                      void copyToClipboard(docId);
                     }}
                     className="px-2 py-1 text-xs font-medium text-secondary-foreground bg-secondary border border-border rounded hover:bg-accent"
                   >
@@ -135,6 +148,12 @@ export const TaskList = ({
       <div className="flex-1 overflow-y-auto flex justify-center items-start py-8">
         <div className="w-full max-w-2xl px-6">
           <div className="bg-background rounded-lg p-6 shadow-sm">
+            {isUnprotected && (
+              <div className="mb-6 rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                This document is{" "}
+                <span className="font-medium">unprotected</span>.
+              </div>
+            )}
             <div className="pb-6 mb-6">
               <div className="flex items-center gap-3 mb-6">
                 {canEdit ? (
@@ -156,13 +175,11 @@ export const TaskList = ({
                 <button
                   type="button"
                   onClick={
-                    shouldShowShareButton
-                      ? () => setIsShareModalOpen(true)
-                      : undefined
+                    canShare ? () => setIsShareModalOpen(true) : undefined
                   }
-                  disabled={!shouldShowShareButton}
+                  disabled={!canShare}
                   className={`px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
-                    shouldShowShareButton
+                    canShare
                       ? "bg-secondary text-secondary-foreground border-border cursor-pointer hover:bg-accent hover:border-ring"
                       : "bg-muted text-muted-foreground border-muted cursor-not-allowed opacity-50"
                   }`}
@@ -177,7 +194,7 @@ export const TaskList = ({
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(docId);
+                    void copyToClipboard(docId);
                   }}
                   className="px-2 py-1 text-xs font-medium text-secondary-foreground bg-secondary border border-border rounded hover:bg-accent"
                 >
@@ -195,7 +212,7 @@ export const TaskList = ({
                       d.tasks.unshift({
                         title: "",
                         done: false,
-                      }),
+                      })
                     );
                   }}
                   className="px-4 py-2 bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium cursor-pointer hover:bg-accent hover:border-ring transition-colors"
@@ -234,7 +251,7 @@ export const TaskList = ({
                             updateText(
                               d,
                               ["tasks", index, "title"],
-                              e.target.value,
+                              e.target.value
                             );
                           })
                         }
@@ -266,7 +283,7 @@ export const TaskList = ({
         docUrl={docUrl}
         phonebook={phonebook}
         hive={hive}
-        keyhiveUpdateTracker={keyhiveUpdateTracker}
+        keyhiveVersion={keyhiveVersion}
         onClose={() => setIsShareModalOpen(false)}
       />
     </div>

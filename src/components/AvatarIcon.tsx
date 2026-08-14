@@ -13,10 +13,10 @@ export function AvatarIcon({ onClick, identityState }: AvatarIconProps) {
     () =>
       avatar
         ? URL.createObjectURL(
-            new Blob([avatar as BlobPart], { type: "image/jpeg" }),
+            new Blob([avatar as BlobPart], { type: "image/jpeg" })
           )
         : null,
-    [avatar],
+    [avatar]
   );
   // Free the blob URL when the avatar changes or the component unmounts.
   useEffect(() => {

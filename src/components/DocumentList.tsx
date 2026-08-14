@@ -10,6 +10,7 @@ import { RootDocument } from "../rootDoc";
 import { useState, useEffect } from "react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import { useReRenderOnDocProgress } from "../hooks";
+import { errorMessage, log } from "../log";
 
 interface DocumentListProps {
   docUrl: AutomergeUrl;
@@ -29,6 +30,7 @@ export const DocumentList = ({
     suspense: true,
   });
   const [inputUrl, setInputUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   // Add the selected document to this identity's list if it is not already
   // there (e.g. when opening a shared document by URL). Keyed only on the
@@ -43,6 +45,7 @@ export const DocumentList = ({
   }, [selectedDocument, changeDoc]);
 
   const handleNewDocument = async () => {
+    setError(null);
     try {
       // repo.create2 routes through ARK's id generator, so the new task list
       // is an access-controlled, end-to-end encrypted keyhive document (unlike
@@ -57,8 +60,9 @@ export const DocumentList = ({
         d.taskLists.push(newTaskList.url);
       });
       onSelectDocument(newTaskList.url);
-    } catch (error) {
-      console.error(`[Demo] Error creating new document: ${error}`);
+    } catch (err) {
+      log.error("Error creating new document:", err);
+      setError(`Could not create the document: ${errorMessage(err)}`);
     }
   };
 
@@ -73,20 +77,28 @@ export const DocumentList = ({
 
   const handleLoadUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputUrl) {
-      const url = `automerge:${inputUrl}`;
-      if (isValidAutomergeUrl(url)) {
-        const docUrl = url as AutomergeUrl;
-        // Add the document to the user's list if it's not already there
-        changeDoc((d) => {
-          if (!d.taskLists.includes(docUrl)) {
-            d.taskLists.push(docUrl);
-          }
-        });
-        onSelectDocument(docUrl);
-        setInputUrl("");
-      }
+    setError(null);
+
+    const trimmed = inputUrl.trim();
+    if (!trimmed) return;
+    const url = trimmed.startsWith("automerge:")
+      ? trimmed
+      : `automerge:${trimmed}`;
+
+    if (!isValidAutomergeUrl(url)) {
+      setError("That is not a valid Automerge document id.");
+      return;
     }
+
+    const loadedUrl = url as AutomergeUrl;
+    // Add the document to the user's list if it's not already there
+    changeDoc((d) => {
+      if (!d.taskLists.includes(loadedUrl)) {
+        d.taskLists.push(loadedUrl);
+      }
+    });
+    onSelectDocument(loadedUrl);
+    setInputUrl("");
   };
 
   return (
@@ -115,6 +127,11 @@ export const DocumentList = ({
             Load
           </button>
         </form>
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
 
       {/* Document list */}
@@ -176,5 +193,5 @@ const DocumentTitle: React.FC<{ docUrl: AutomergeUrl }> = React.memo(
 
     const title = doc.title || "Untitled Task List";
     return <span className="text-sm font-medium text-foreground">{title}</span>;
-  },
+  }
 );

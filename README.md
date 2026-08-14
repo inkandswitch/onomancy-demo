@@ -19,15 +19,25 @@ demonstrates:
 ## Run
 
 The demo needs a phonebook document id, which it requires you to supply. Generate
-one, then pass it in:
+one into a `.env` file, then start the app:
 
 ```
 pnpm install
-pnpm gen:phonebook-id
-PHONEBOOK_DOC_ID=automerge:... pnpm dev
+echo "PHONEBOOK_DOC_ID=$(pnpm -s gen:phonebook-id)" > .env
+pnpm dev
 ```
 
 The app opens at http://localhost:5557.
+
+Do this once. Keep the same id from then on. A fresh one points the app at a
+brand new, empty phonebook, so every name and avatar disappears. `.env` is
+gitignored.
+
+To override the id for a single run without touching `.env`:
+
+```
+PHONEBOOK_DOC_ID=automerge:... pnpm dev
+```
 
 ## Phonebook configuration
 
@@ -44,7 +54,7 @@ given id seeds it, and later peers pick it up from the sync server.
 Keep in mind that the id is the only thing protecting the phonebook. Anyone you
 give it to, and anyone they give it to, can edit its entries. This is fine for a
 demo but is not an access-control mechanism. The TODO documents themselves are
-end-to-end encrypted and access-controlled by keyhive; the phonebook is not.
+end-to-end encrypted and access-controlled by keyhive.
 
 ## Sync server configuration
 

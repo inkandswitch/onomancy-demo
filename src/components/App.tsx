@@ -10,81 +10,37 @@ import { DocumentList } from "./DocumentList";
 import { useHash } from "react-use";
 import { AvatarIcon } from "./AvatarIcon";
 import { UserModal } from "./UserModal";
-import { useState, useEffect, Component, type ReactNode } from "react";
+import { useState, useEffect } from "react";
 import { Phonebook, PHONEBOOK_URL } from "../phonebook";
 import { Identity } from "../active";
-import { useReRenderOnDocProgress } from "../hooks";
+import { useKeyhiveUpdates, useReRenderOnDocProgress } from "../hooks";
 import {
   AutomergeRepoKeyhive,
   uint8ArrayToHex,
   ContactCard,
-  KEYHIVE_SYNC_SERVER_CONTACT_CARD_JSON,
-  KEYHIVE_SYNC_SERVER_PEER_ID,
+  verifyingKeyPeerIdWithoutSuffix,
 } from "@automerge/automerge-repo-keyhive";
+import * as syncServer from "../syncServer";
+import { log } from "../log";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 type AppProps = {
   docUrl: AutomergeUrl;
   automergeRepoKeyhive: AutomergeRepoKeyhive;
 };
 
-class ErrorBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.error("[Demo] Caught error:", error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return null;
-    }
-    return this.props.children;
-  }
-}
-
 function App({ docUrl, automergeRepoKeyhive }: AppProps) {
-  const [keyhiveUpdateTracker, setKeyhiveUpdateTracker] = useState(0);
+  const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
 
-  // Watch for keyhive updates - debounced to avoid excessive re-renders
-  useEffect(() => {
-    let timeoutId: number;
-    const handler = () => {
-      clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        setKeyhiveUpdateTracker((v) => v + 1);
-      }, 100);
-    };
-
-    // "update" fires for locally-originated keyhive changes; remote ops
-    // arriving over sync signal "ingest-remote" on the network adapter.
-    automergeRepoKeyhive.emitter.on("update", handler);
-    automergeRepoKeyhive.networkAdapter.on("ingest-remote", handler);
-    return () => {
-      clearTimeout(timeoutId);
-      automergeRepoKeyhive.emitter.off("update", handler);
-      automergeRepoKeyhive.networkAdapter.off("ingest-remote", handler);
-    };
-  }, [automergeRepoKeyhive.emitter, automergeRepoKeyhive.networkAdapter]);
-
-  // The phonebook is a shared doc that syncs in from the server (or is seeded
-  // locally on first run; see ensurePhonebook). Observe its load progress so
+  // The phonebook is a shared doc that syncs from the server (or is seeded
+  // locally on first run). Observe its load progress so
   // names and avatars (including the sync server's) appear once it arrives,
-  // without a page reload (see useReRenderOnDocProgress).
+  // without a page reload.
   useReRenderOnDocProgress(PHONEBOOK_URL);
   const [identityState, setIdentityState] = useState<Identity>(() => ({
     active: automergeRepoKeyhive.active,
     contact: {
-      peerId: automergeRepoKeyhive.active.peerId,
+      peerId: verifyingKeyPeerIdWithoutSuffix(automergeRepoKeyhive.peerId),
       avatar: null,
     },
   }));
@@ -94,7 +50,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
   useEffect(() => {
     if (phonebook && identityState.active.individual) {
       const userHexId = uint8ArrayToHex(
-        identityState.active.individual.id.toBytes(),
+        identityState.active.individual.id.toBytes()
       );
       const savedContact = phonebook[userHexId];
       if (savedContact) {
@@ -110,30 +66,32 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
     }
   }, [phonebook, identityState.active.individual]);
 
-  // Add sync server to phonebook if not already there. The demo targets the
-  // canonical keyhive sync server identity (also used by the local dev
-  // server), so its contact card is a known constant.
+  // Give the sync server an avatar in the phonebook, so it is recognizable in
+  // the share dialog's member list. Derived from the configured server.
+  //
+  // Only the avatar is stored. The name comes from syncServer.DISPLAY_NAME at
+  // render time, because ARK already tells us which member is the sync server.
   useEffect(() => {
     if (!phonebook) return;
     const serverContactCard = ContactCard.fromJson(
-      KEYHIVE_SYNC_SERVER_CONTACT_CARD_JSON,
+      syncServer.CONTACT_CARD_JSON
     );
     if (!serverContactCard) return;
     const serverHexId = uint8ArrayToHex(serverContactCard.individualId.bytes);
-    if (!phonebook[serverHexId]) {
-      // Load HAL avatar and add to phonebook
-      fetch(halAvatarUrl)
-        .then((res) => res.arrayBuffer())
-        .then((buffer) => {
-          changePhonebook((doc) => {
-            doc[serverHexId] = {
-              peerId: KEYHIVE_SYNC_SERVER_PEER_ID,
-              name: "Demo Sync Server",
-              avatar: new Uint8Array(buffer),
-            };
-          });
+    if (phonebook[serverHexId]) return;
+    fetch(halAvatarUrl)
+      .then((res) => res.arrayBuffer())
+      .then((buffer) => {
+        changePhonebook((doc) => {
+          doc[serverHexId] = {
+            peerId: syncServer.PEER_ID,
+            avatar: new Uint8Array(buffer),
+          };
         });
-    }
+      })
+      .catch((error) => {
+        log.error("Could not load the sync server avatar:", error);
+      });
   }, [phonebook, changePhonebook]);
 
   const [hash, setHash] = useHash();
@@ -188,7 +146,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
                 phonebook={phonebook}
                 hive={automergeRepoKeyhive}
                 identity={identityState}
-                keyhiveUpdateTracker={keyhiveUpdateTracker}
+                keyhiveVersion={keyhiveVersion}
               />
             </ErrorBoundary>
           ) : (
@@ -198,13 +156,14 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
           )}
         </div>
       </div>
-      <UserModal
-        isOpen={isUserModalOpen}
-        onClose={() => setIsUserModalOpen(false)}
-        identityState={identityState}
-        setIdentityState={setIdentityState}
-        changePhonebook={changePhonebook}
-      />
+      {isUserModalOpen && (
+        <UserModal
+          onClose={() => setIsUserModalOpen(false)}
+          identityState={identityState}
+          setIdentityState={setIdentityState}
+          changePhonebook={changePhonebook}
+        />
+      )}
     </div>
   );
 }
