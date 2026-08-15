@@ -9,7 +9,7 @@ import { initTaskList, TaskList } from "../taskListDoc";
 import { RootDocument } from "../rootDoc";
 import { useState, useEffect } from "react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
-import { useReRenderOnDocProgress } from "../hooks";
+import { useReRenderOnDocProgress } from "keyhive-react";
 import { errorMessage, log } from "../log";
 
 interface DocumentListProps {

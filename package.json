@@ -8,8 +8,8 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "pnpm --filter keyhive-react build && vite",
+    "build": "pnpm --filter keyhive-react build && tsc && vite build",
     "gen:phonebook-id": "node scripts/generate-phonebook-id.mjs",
     "lint": "eslint . && prettier --check \"**/*.{ts,tsx,js,mjs}\"",
     "lint:fix": "eslint . --fix && prettier --write \"**/*.{ts,tsx,js,mjs}\"",
@@ -23,6 +23,7 @@
     "@automerge/automerge-subduction": "0.16.0",
     "@automerge/react": "2.6.0-subduction.40",
     "@keyhive/keyhive": "0.1.0-alpha.6",
+    "keyhive-react": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-use": "^17.6.0",

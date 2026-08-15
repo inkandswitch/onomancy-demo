@@ -7,8 +7,7 @@ import {
   isUnprotectedDoc,
 } from "@automerge/automerge-repo-keyhive";
 import { Phonebook } from "../phonebook";
-import { Identity } from "../active";
-import { useReRenderOnDocProgress } from "../hooks";
+import { useReRenderOnDocProgress } from "keyhive-react";
 import { TaskList as TaskListDoc } from "../taskListDoc";
 import { copyToClipboard } from "../clipboard";
 import { log } from "../log";
@@ -23,7 +22,6 @@ interface TaskListProps {
   docUrl: AutomergeUrl;
   phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
-  identity: Identity;
   keyhiveVersion: number;
 }
 
@@ -31,7 +29,6 @@ export const TaskList = ({
   docUrl,
   phonebook,
   hive,
-  identity,
   keyhiveVersion,
 }: TaskListProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -67,7 +64,7 @@ export const TaskList = ({
         // so a publicly-shared document is readable by a peer with no
         // membership of its own.
         const best = await hive.bestAccessForDoc(
-          identity.active.individual.id,
+          hive.active.individual.id,
           docUrl
         );
         // Store a new Access only when it actually differs. Every call returns
@@ -90,7 +87,7 @@ export const TaskList = ({
     return () => {
       cancelled = true;
     };
-  }, [keyhiveVersion, identity.active.individual, docUrl, hive, isUnprotected]);
+  }, [keyhiveVersion, docUrl, hive, isUnprotected]);
 
   const canRead = isUnprotected || (access?.isReader ?? false);
   const canEdit = isUnprotected || (access?.isEditor ?? false);
