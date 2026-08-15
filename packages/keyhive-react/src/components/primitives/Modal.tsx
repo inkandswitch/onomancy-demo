@@ -7,7 +7,7 @@ export interface ModalProps {
   children: ReactNode;
   widthClassName?: string;
   className?: string;
-  /** Play the `fadeIn` and `slideIn` keyframes if the app defines them. */
+  /** Play the entry animation. Keyframes are available in styles.css. */
   animate?: boolean;
 }
 
@@ -22,7 +22,7 @@ export function Modal({
   onClose,
   title,
   children,
-  widthClassName = "max-w-md",
+  widthClassName = "kh-max-w-md",
   className = "",
   animate = true,
 }: ModalProps) {
@@ -45,30 +45,36 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-auto bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 transition-all duration-200"
+      className="kh-fixed kh-inset-0 kh-z-50 kh-overflow-auto kh-bg-background/80 kh-backdrop-blur-sm kh-flex kh-items-center kh-justify-center kh-p-4 kh-transition-all kh-duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      style={animate ? { animation: "fadeIn 0.2s ease-out" } : undefined}
+      style={
+        animate ? { animation: "keyhive-fade-in 0.2s ease-out" } : undefined
+      }
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`bg-card rounded-lg shadow-lg border border-border ${widthClassName} w-full max-h-[90vh] overflow-auto transition-all duration-200 transform ring-1 ring-ring/20 ring-offset-2 ring-offset-background ${className}`}
+        className={`kh-bg-card kh-rounded-lg kh-shadow-lg kh-border kh-border-border ${widthClassName} kh-w-full kh-max-h-[90vh] kh-overflow-auto kh-transition-all kh-duration-200 kh-transform kh-ring-1 kh-ring-ring/20 kh-ring-offset-2 kh-ring-offset-background ${className}`}
         onClick={(e) => e.stopPropagation()}
-        style={animate ? { animation: "slideIn 0.2s ease-out" } : undefined}
+        style={
+          animate ? { animation: "keyhive-slide-in 0.2s ease-out" } : undefined
+        }
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        <div className="kh-p-6">
+          <div className="kh-flex kh-items-center kh-justify-between kh-mb-6">
+            <h2 className="kh-text-xl kh-font-semibold kh-text-foreground">
+              {title}
+            </h2>
             <button
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="kh-text-muted-foreground hover:kh-text-foreground kh-transition-colors"
               aria-label="Close modal"
             >
               <svg
-                className="w-6 h-6"
+                className="kh-w-6 kh-h-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

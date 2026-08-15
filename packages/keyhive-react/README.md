@@ -6,6 +6,7 @@ React components for applications that use keyhive.
 | --- | --- |
 | `AccountView` | Display name, avatar, and the local contact card |
 | `PermissionsEditor` | Adding and removing members on a document |
+| `DirectoryProvider` | Putting a name directory in scope |
 
 Plus `useKeyhiveUpdates`, `useReRenderOnDocProgress`, `useSelfIdentity` and
 `useAvatarUrl`.
@@ -13,33 +14,74 @@ Plus `useKeyhiveUpdates`, `useReRenderOnDocProgress`, `useSelfIdentity` and
 ## Using it
 
 ```tsx
-const keyhiveVersion = useKeyhiveUpdates(hive);
+import * as ark from "@automerge/automerge-repo-keyhive";
+import {
+  createKeyhiveRuntime,
+  DirectoryProvider,
+  PermissionsEditor,
+  useKeyhiveUpdates,
+} from "keyhive-react";
+import "keyhive-react/styles.css";
 
-<PermissionsEditor
-  hive={hive}
-  docUrl={docUrl}
-  contacts={contacts}
-  refreshToken={keyhiveVersion}
-/>;
+const runtime = createKeyhiveRuntime(ark);
+
+function Share({ hive, docUrl, directory }) {
+  const keyhiveVersion = useKeyhiveUpdates(hive);
+  return (
+    <DirectoryProvider directory={directory}>
+      <PermissionsEditor
+        runtime={runtime}
+        hive={hive}
+        docUrl={docUrl}
+        refreshToken={keyhiveVersion}
+      />
+    </DirectoryProvider>
+  );
+}
 ```
 
 Membership queries are async and keyhive has no per-document change
 notification, so components re-read when `refreshToken` changes. Subscribe once
 near the top of an app rather than per component.
 
-`contacts` is supplied by the application and maps a hex keyhive id to a display name and avatar.
+## The keyhive runtime
+
+`createKeyhiveRuntime(ark)` supplies the keyhive constructors from the
+application's own copy of ARK. The package imports none of them itself so
+there is no second module instance of a WASM-backed package to resolve wrongly.
+
+`pnpm build` runs `scripts/check-isolation.mjs` which fails if the compiled
+output imports anything but React.
+
+## The name directory
+
+Components look peers up in the directory in scope and know nothing about where
+the answer comes from, so a name registry is swapped by passing a different
+object to `DirectoryProvider`.
+
+A directory declares what it cannot do rather than stubbing it: `writable`,
+`enumerable`, and `trust`, with an optional `notice` the components display.
+`subscribe` is optional, for directories whose contents live outside React.
+
+`createAutomergeDocDirectory` covers a shared Automerge map document that each
+peer writes its own entry into.
 
 ## Styling
 
-Components render Tailwind utilities against the semantic token names
-shadcn/ui uses (`background`, `card`, `muted`, `border`, and their
-`-foreground` pairs). An app needs those tokens, and needs this package in its
-Tailwind `content` globs or the classes are purged.
+```ts
+import "keyhive-react/styles.css";
+```
 
-`Modal` plays the optional `fadeIn` and `slideIn` keyframes.
+Every class is prefixed `kh-` and every custom property `--kh-`, so the
+stylesheet works in an application without Tailwind and alongside one with it.
+There is no preflight. Override the tokens to restyle, and add the `dark` class
+to a wrapper for the dark palette.
+
+`scripts/check-prefix.mjs`, also part of `pnpm build`, fails if any unprefixed
+Tailwind class is reachable from the source.
 
 No images ship with the package. `Avatar` falls back to an initial, or `?` when
-all it has is a hex id. Pass `fallbackSrc` for an app's own placeholder.
+all it has is a hex id.
 
 ## Building
 
@@ -47,8 +89,8 @@ all it has is a hex id. Pass `fallbackSrc` for an app's own placeholder.
 pnpm --filter keyhive-react build
 ```
 
-Both `dev` and `build` in the consuming app run this first, so `dist` is never
-stale. It is not committed.
+Consuming apps build the library first, so `dist` is never stale. It is not
+committed.
 
 ## Notes on the keyhive API
 

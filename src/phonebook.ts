@@ -3,25 +3,24 @@
 // The phonebook is a legacy, unencrypted document that is not access-controlled
 // by keyhive. Every peer reads and writes to it, and only "security by obscurity"
 // is protecting it. If you have its id, you have access.
+//
+// It reaches the UI as a NameDirectory, which is the only thing the components
+// know about. Replacing it with a real name registry means writing another
+// NameDirectory and handing that to DirectoryProvider in App.tsx.
 
 import {
   AutomergeUrl,
-  PeerId,
   Repo,
   interpretAsDocumentId,
   isValidAutomergeUrl,
 } from "@automerge/react";
+import type { DirectoryDoc } from "keyhive-react";
 
-export type Contact = {
-  peerId: PeerId;
-  name?: string;
-  // Optional: the sync server's entry carries an avatar but no name, since the
-  // UI labels it from ARK's DocMember.isSyncServer flag instead.
-  avatar?: Uint8Array | null;
-};
+// Maps hex-encoded keyhive id to that peer's name and avatar.
+export type Phonebook = DirectoryDoc;
 
-// Maps hexId to Contact
-export type Phonebook = Record<string, Contact>;
+export const PHONEBOOK_NOTICE =
+  "Names come from the demo phonebook, an unencrypted document that anyone with its id can edit. They are not verified.";
 
 // The phonebook is a single document that every peer reads and writes, so names
 // and avatars are visible to everyone who has its id. Its id comes from the

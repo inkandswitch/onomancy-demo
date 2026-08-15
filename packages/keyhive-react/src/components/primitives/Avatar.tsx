@@ -19,7 +19,7 @@ function isAbbreviatedId(label: string): boolean {
 export function Avatar({
   avatar,
   name,
-  sizeClassName = "w-8 h-8",
+  sizeClassName = "kh-w-8 kh-h-8",
   fallbackSrc,
   className = "",
 }: AvatarProps) {
@@ -32,7 +32,7 @@ export function Avatar({
       <img
         src={src}
         alt={label}
-        className={`${sizeClassName} rounded-full object-cover ${className}`}
+        className={`${sizeClassName} kh-rounded-full kh-object-cover ${className}`}
       />
     );
   }
@@ -43,7 +43,7 @@ export function Avatar({
     <div
       role="img"
       aria-label={label}
-      className={`${sizeClassName} rounded-full bg-secondary text-secondary-foreground flex items-center justify-center text-sm font-medium select-none ${className}`}
+      className={`${sizeClassName} kh-rounded-full kh-bg-secondary kh-text-secondary-foreground kh-flex kh-items-center kh-justify-center kh-text-sm kh-font-medium kh-select-none ${className}`}
     >
       {named ? label[0].toUpperCase() : "?"}
     </div>

@@ -1,4 +1,9 @@
-import { AutomergeUrl, useDocument, updateText } from "@automerge/react/slim";
+import {
+  AutomergeUrl,
+  useDocument,
+  updateText,
+  useRepo,
+} from "@automerge/react/slim";
 import { ShareModal } from "./ShareModal";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -6,7 +11,6 @@ import {
   AutomergeRepoKeyhive,
   isUnprotectedDoc,
 } from "@automerge/automerge-repo-keyhive";
-import { Phonebook } from "../phonebook";
 import { useReRenderOnDocProgress } from "keyhive-react";
 import { TaskList as TaskListDoc } from "../taskListDoc";
 import { copyToClipboard } from "../clipboard";
@@ -20,24 +24,18 @@ function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
 
 interface TaskListProps {
   docUrl: AutomergeUrl;
-  phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
   keyhiveVersion: number;
 }
 
-export const TaskList = ({
-  docUrl,
-  phonebook,
-  hive,
-  keyhiveVersion,
-}: TaskListProps) => {
+export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [access, setAccess] = useState<Access | undefined>(undefined);
   const [accessChecked, setAccessChecked] = useState(false);
 
   // Re-render when the document becomes available so a newly-granted doc
   // renders without a page reload (see useReRenderOnDocProgress).
-  useReRenderOnDocProgress(docUrl);
+  useReRenderOnDocProgress(useRepo(), docUrl);
   const [doc, changeDoc] = useDocument<TaskListDoc>(docUrl);
 
   const isUnprotected = useMemo(() => {
@@ -278,7 +276,6 @@ export const TaskList = ({
       <ShareModal
         isOpen={isShareModalOpen}
         docUrl={docUrl}
-        phonebook={phonebook}
         hive={hive}
         keyhiveVersion={keyhiveVersion}
         onClose={() => setIsShareModalOpen(false)}

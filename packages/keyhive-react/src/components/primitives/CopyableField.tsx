@@ -35,32 +35,34 @@ export function CopyableField({
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-foreground mb-2">
+      <label className="kh-block kh-text-sm kh-font-medium kh-text-foreground kh-mb-2">
         {label}
       </label>
-      <div className="w-full px-3 py-2 bg-muted text-muted-foreground rounded-md text-sm font-mono break-all">
+      <div className="kh-w-full kh-px-3 kh-py-2 kh-bg-muted kh-text-muted-foreground kh-rounded-md kh-text-sm kh-font-mono kh-break-all">
         {value}
       </div>
-      <div className="mt-2 flex items-center gap-2">
+      <div className="kh-mt-2 kh-flex kh-items-center kh-gap-2">
         <button
           type="button"
           onClick={() => void copy()}
-          className="px-3 py-1.5 text-sm font-medium text-secondary-foreground bg-secondary border border-border rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+          className="kh-px-3 kh-py-1.5 kh-text-sm kh-font-medium kh-text-secondary-foreground kh-bg-secondary kh-border kh-border-border kh-rounded-md hover:kh-bg-accent focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring"
         >
           Copy to Clipboard
         </button>
         {status === "copied" && (
-          <span role="status" className="text-sm text-muted-foreground">
+          <span role="status" className="kh-text-sm kh-text-muted-foreground">
             Copied
           </span>
         )}
         {status === "failed" && (
-          <span role="alert" className="text-sm text-destructive">
+          <span role="alert" className="kh-text-sm kh-text-destructive">
             Could not copy. Select the text and copy it by hand.
           </span>
         )}
       </div>
-      {help && <p className="mt-2 text-xs text-muted-foreground">{help}</p>}
+      {help && (
+        <p className="kh-mt-2 kh-text-xs kh-text-muted-foreground">{help}</p>
+      )}
     </div>
   );
 }

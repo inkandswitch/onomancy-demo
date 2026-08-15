@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Access,
-  ContactCard,
-  type AutomergeRepoKeyhiveBase,
-  type DocMember,
+import type {
+  AutomergeRepoKeyhiveBase,
+  DocMember,
 } from "@automerge/automerge-repo-keyhive";
 import type { AutomergeUrl } from "@automerge/react/slim";
-import { shortId, type ContactMap } from "../contacts";
+import { shortId, useDirectory } from "../directory/context";
+import type { NameDirectory } from "../directory/types";
+import type { KeyhiveRuntime } from "../runtime";
 import { AccessBadge } from "./primitives/AccessBadge";
 import { Avatar } from "./primitives/Avatar";
 
 export interface PermissionsEditorProps {
+  runtime: KeyhiveRuntime;
   hive: AutomergeRepoKeyhiveBase;
   docUrl: AutomergeUrl;
-  contacts: ContactMap | undefined;
   /**
    * Counter that triggers a re-read of the member list. Pass the value from
    * `useKeyhiveUpdates`.
@@ -21,7 +21,7 @@ export interface PermissionsEditorProps {
   refreshToken?: number;
   /** Set false to stop loading, for example while a dialog is closed. */
   enabled?: boolean;
-  /** Label for a member no contact entry covers, such as a sync server. */
+  /** Label for a member the directory does not know, such as a sync server. */
   labelForMember?: (member: DocMember) => string | undefined;
   showPublicAccess?: boolean;
   /** The level "Make Public" grants. Default `"edit"`. */
@@ -32,12 +32,12 @@ export interface PermissionsEditorProps {
 
 function memberLabel(
   member: DocMember,
-  contacts: ContactMap | undefined,
+  directory: NameDirectory,
   labelForMember?: (member: DocMember) => string | undefined
 ): string {
   if (member.isPublic) return "Public";
   return (
-    contacts?.[member.id]?.name ??
+    directory.lookup(member.id)?.name ??
     labelForMember?.(member) ??
     shortId(member.id)
   );
@@ -50,9 +50,9 @@ function memberLabel(
  * an admin can revoke members.
  */
 export function PermissionsEditor({
+  runtime,
   hive,
   docUrl,
-  contacts,
   refreshToken = 0,
   enabled = true,
   labelForMember,
@@ -61,6 +61,7 @@ export function PermissionsEditor({
   fallbackAvatarSrc,
   className = "",
 }: PermissionsEditorProps) {
+  const directory = useDirectory();
   const [members, setMembers] = useState<DocMember[]>([]);
   const [isLoading, setIsLoading] = useState(enabled);
   const [contactCardInput, setContactCardInput] = useState("");
@@ -102,20 +103,24 @@ export function PermissionsEditor({
   const publicMember = members.find((m) => m.isPublic);
   const currentPublicAccess = publicMember?.access.toString();
 
-  const adminAccess = useMemo(() => Access.admin(), []);
+  const adminAccess = useMemo(() => runtime.Access.admin(), [runtime]);
   const isAdmin = myAccess?.atLeast(adminAccess) ?? false;
   const canDelegate = myAccess?.isReader ?? false;
 
   // You can grant your own level or anything below it.
   const delegationOptions = useMemo(() => {
     if (!myAccess) return [];
+    const { Access } = runtime;
     return [Access.relay(), Access.read(), Access.edit(), Access.admin()]
       .filter((level) => myAccess.atLeast(level))
       .map((level) => level.toString());
-  }, [myAccess]);
+  }, [runtime, myAccess]);
 
   useEffect(() => {
-    if (delegationOptions.length > 0 && !delegationOptions.includes(selectedLevel)) {
+    if (
+      delegationOptions.length > 0 &&
+      !delegationOptions.includes(selectedLevel)
+    ) {
       setSelectedLevel(delegationOptions[delegationOptions.length - 1]);
     }
   }, [delegationOptions, selectedLevel]);
@@ -123,11 +128,11 @@ export function PermissionsEditor({
   const sortedMembers = useMemo(
     () =>
       [...members].sort((a, b) =>
-        memberLabel(a, contacts, labelForMember).localeCompare(
-          memberLabel(b, contacts, labelForMember)
+        memberLabel(a, directory, labelForMember).localeCompare(
+          memberLabel(b, directory, labelForMember)
         )
       ),
-    [members, contacts, labelForMember]
+    [members, directory, labelForMember]
   );
 
   const run = async (taskDescription: string, task: () => Promise<void>) => {
@@ -139,7 +144,9 @@ export function PermissionsEditor({
       // result without waiting for the debounce.
       setReload((n) => n + 1);
     } catch (err) {
-      setError(`Could not ${taskDescription}: ${err instanceof Error ? err.message : String(err)}`);
+      setError(
+        `Could not ${taskDescription}: ${err instanceof Error ? err.message : String(err)}`
+      );
     } finally {
       setIsBusy(false);
     }
@@ -151,10 +158,10 @@ export function PermissionsEditor({
     if (!json) return;
 
     void run("share document", async () => {
-      const contactCard = ContactCard.fromJson(json);
+      const contactCard = runtime.ContactCard.fromJson(json);
       if (!contactCard) throw new Error("Not a valid contact card");
       // Throws on an unrecognized access level.
-      const access = Access.fromString(selectedLevel);
+      const access = runtime.Access.fromString(selectedLevel);
       await hive.addMemberToDoc(docUrl, contactCard, access);
       setContactCardInput("");
     });
@@ -163,21 +170,21 @@ export function PermissionsEditor({
   return (
     <div className={className}>
       {canDelegate && (
-        <form onSubmit={handleAdd} className="mb-6">
-          <div className="flex gap-2">
+        <form onSubmit={handleAdd} className="kh-mb-6">
+          <div className="kh-flex kh-gap-2">
             <input
               type="text"
               value={contactCardInput}
               onChange={(e) => setContactCardInput(e.target.value)}
               placeholder="Contact Card"
               aria-label="Contact card"
-              className="flex-1 px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm bg-background text-foreground"
+              className="kh-flex-1 kh-px-3 kh-py-2 kh-border kh-border-border kh-rounded-md kh-shadow-sm focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-ring focus:kh-border-ring kh-text-sm kh-bg-background kh-text-foreground"
             />
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
               aria-label="Access level"
-              className="px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm bg-background text-foreground"
+              className="kh-px-3 kh-py-2 kh-border kh-border-border kh-rounded-md kh-shadow-sm focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-ring focus:kh-border-ring kh-text-sm kh-bg-background kh-text-foreground"
             >
               {delegationOptions.map((level) => (
                 <option key={level} value={level}>
@@ -188,7 +195,7 @@ export function PermissionsEditor({
             <button
               type="submit"
               disabled={isBusy}
-              className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border disabled:opacity-50"
+              className="kh-px-4 kh-py-2 kh-bg-secondary kh-text-secondary-foreground kh-text-sm kh-font-medium kh-rounded-md hover:kh-bg-accent focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring kh-transition-colors kh-border kh-border-border disabled:kh-opacity-50"
             >
               Add
             </button>
@@ -197,22 +204,22 @@ export function PermissionsEditor({
       )}
 
       {error && (
-        <p role="alert" className="mb-4 text-sm text-destructive">
+        <p role="alert" className="kh-mb-4 kh-text-sm kh-text-destructive">
           {error}
         </p>
       )}
 
       {showPublicAccess && (
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <p className="text-sm text-foreground">
+        <div className="kh-mb-6 kh-flex kh-items-center kh-justify-between kh-gap-3">
+          <p className="kh-text-sm kh-text-foreground">
             {currentPublicAccess ? (
               <>
-                This document is <span className="font-medium">public</span> (
-                {currentPublicAccess.toUpperCase()})
+                This document is <span className="kh-font-medium">public</span>{" "}
+                ({currentPublicAccess.toUpperCase()})
               </>
             ) : (
               <>
-                This document is <span className="font-medium">private</span>
+                This document is <span className="kh-font-medium">private</span>
               </>
             )}
           </p>
@@ -228,7 +235,7 @@ export function PermissionsEditor({
                   })
                 }
                 disabled={isBusy}
-                className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border disabled:opacity-50"
+                className="kh-px-4 kh-py-2 kh-bg-secondary kh-text-secondary-foreground kh-text-sm kh-font-medium kh-rounded-md hover:kh-bg-accent focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring kh-transition-colors kh-border kh-border-border disabled:kh-opacity-50"
               >
                 Make Private
               </button>
@@ -238,12 +245,12 @@ export function PermissionsEditor({
                   void run("make document public", () =>
                     hive.setPublicAccess(
                       docUrl,
-                      Access.fromString(publicAccessLevel)
+                      runtime.Access.fromString(publicAccessLevel)
                     )
                   )
                 }
                 disabled={isBusy}
-                className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border disabled:opacity-50"
+                className="kh-px-4 kh-py-2 kh-bg-secondary kh-text-secondary-foreground kh-text-sm kh-font-medium kh-rounded-md hover:kh-bg-accent focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring kh-transition-colors kh-border kh-border-border disabled:kh-opacity-50"
               >
                 Make Public
               </button>
@@ -251,35 +258,37 @@ export function PermissionsEditor({
         </div>
       )}
 
-      <hr className="border-border mb-6" />
+      <hr className="kh-border-border kh-mb-6" />
 
       <div>
-        <h3 className="text-sm font-medium text-foreground mb-4">
+        <h3 className="kh-text-sm kh-font-medium kh-text-foreground kh-mb-4">
           Current Access
         </h3>
-        <div className="space-y-3">
+        <div className="kh-space-y-3">
           {isLoading ? (
-            <p className="text-sm text-muted-foreground italic">Loading...</p>
+            <p className="kh-text-sm kh-text-muted-foreground kh-italic">
+              Loading...
+            </p>
           ) : members.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">
+            <p className="kh-text-sm kh-text-muted-foreground kh-italic">
               No users have access yet
             </p>
           ) : (
             sortedMembers.map((member) => {
-              const label = memberLabel(member, contacts, labelForMember);
+              const label = memberLabel(member, directory, labelForMember);
               return (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between gap-2 py-2 px-3 bg-muted rounded-md"
+                  className="kh-flex kh-items-center kh-justify-between kh-gap-2 kh-py-2 kh-px-3 kh-bg-muted kh-rounded-md"
                 >
-                  <div className="flex items-center space-x-3 min-w-0">
+                  <div className="kh-flex kh-items-center kh-space-x-3 kh-min-w-0">
                     <Avatar
-                      avatar={contacts?.[member.id]?.avatar}
+                      avatar={directory.lookup(member.id)?.avatar}
                       name={label}
                       fallbackSrc={fallbackAvatarSrc}
                     />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">
+                    <div className="kh-min-w-0">
+                      <div className="kh-text-sm kh-font-medium kh-text-foreground kh-truncate">
                         {label}
                       </div>
                       <AccessBadge access={member.access.toString()} />
@@ -294,11 +303,11 @@ export function PermissionsEditor({
                         )
                       }
                       disabled={isBusy}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-1 disabled:opacity-50 shrink-0"
+                      className="kh-text-muted-foreground hover:kh-text-destructive kh-transition-colors kh-p-1 disabled:kh-opacity-50 kh-shrink-0"
                       aria-label={`Remove ${label}`}
                     >
                       <svg
-                        className="w-4 h-4"
+                        className="kh-w-4 kh-h-4"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -318,6 +327,12 @@ export function PermissionsEditor({
           )}
         </div>
       </div>
+
+      {directory.notice && (
+        <p className="kh-mt-4 kh-text-xs kh-text-muted-foreground">
+          {directory.notice}
+        </p>
+      )}
     </div>
   );
 }

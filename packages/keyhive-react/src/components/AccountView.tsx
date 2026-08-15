@@ -1,16 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { Contact, ContactMap } from "../contacts";
+import { useDirectory, useDirectoryEntry } from "../directory/context";
+import type { DirectoryEntry } from "../directory/types";
 import { useSelfIdentity, type KeyhiveHive } from "../hooks/useSelfIdentity";
 import { Avatar } from "./primitives/Avatar";
 import { CopyableField } from "./primitives/CopyableField";
 
 export interface AccountViewProps {
   hive: KeyhiveHive;
-  /** Known display information, used to populate the form. */
-  contacts: ContactMap | undefined;
-  /** Persist the local identity's own entry. Omit to make the view read-only. */
-  onSave?: (id: string, contact: Contact) => void | Promise<void>;
-  onSaved?: () => void;
+  /** Called after the profile has been written to the directory. */
+  onSaved?: (entry: DirectoryEntry) => void;
   /** Renders a Cancel button when supplied. */
   onCancel?: () => void;
   showIdentifiers?: boolean;
@@ -27,16 +25,15 @@ export interface AccountViewProps {
  */
 export function AccountView({
   hive,
-  contacts,
-  onSave,
   onSaved,
   onCancel,
   showIdentifiers = true,
   fallbackAvatarSrc,
   className = "",
 }: AccountViewProps) {
+  const directory = useDirectory();
   const self = useSelfIdentity(hive);
-  const entry = contacts?.[self.id];
+  const entry = useDirectoryEntry(self.id);
   const fieldId = useId();
 
   const [name, setName] = useState(entry?.name ?? "");
@@ -62,7 +59,7 @@ export function AccountView({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!onSave) return;
+    if (!directory.publish) return;
 
     setError(null);
     setIsSaving(true);
@@ -70,13 +67,17 @@ export function AccountView({
       const avatar = avatarFile
         ? new Uint8Array(await avatarFile.arrayBuffer())
         : (entry?.avatar ?? null);
-      await onSave(self.id, { peerId: self.peerId, name, avatar });
+      const updated: DirectoryEntry = {
+        id: self.id,
+        peerId: self.peerId,
+        name,
+        avatar,
+      };
+      await directory.publish(updated);
       setAvatarFile(null);
-      onSaved?.();
+      onSaved?.(updated);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not save profile."
-      );
+      setError(err instanceof Error ? err.message : "Could not save profile.");
     } finally {
       setIsSaving(false);
     }
@@ -85,32 +86,32 @@ export function AccountView({
   return (
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      className={`space-y-6 ${className}`}
+      className={`kh-space-y-6 ${className}`}
     >
-      <div className="flex flex-col items-center space-y-4">
+      <div className="kh-flex kh-flex-col kh-items-center kh-space-y-4">
         {filePreview ? (
           <img
             src={filePreview}
             alt="Avatar preview"
-            className="w-20 h-20 rounded-full object-cover border-4 border-border"
+            className="kh-w-20 kh-h-20 kh-rounded-full kh-object-cover kh-border-4 kh-border-border"
           />
         ) : (
           <Avatar
             avatar={entry?.avatar}
             name={name}
-            sizeClassName="w-20 h-20"
+            sizeClassName="kh-w-20 kh-h-20"
             fallbackSrc={fallbackAvatarSrc}
-            className="border-4 border-border"
+            className="kh-border-4 kh-border-border"
           />
         )}
 
         <div>
           <label
             htmlFor={`${fieldId}-avatar`}
-            className="cursor-pointer inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-secondary-foreground bg-secondary hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+            className="kh-cursor-pointer kh-inline-flex kh-items-center kh-px-4 kh-py-2 kh-border kh-border-border kh-rounded-md kh-shadow-sm kh-text-sm kh-font-medium kh-text-secondary-foreground kh-bg-secondary hover:kh-bg-accent focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring"
           >
             <svg
-              className="w-4 h-4 mr-2"
+              className="kh-w-4 kh-h-4 kh-mr-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -129,7 +130,7 @@ export function AccountView({
             type="file"
             accept="image/*"
             onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-            className="hidden"
+            className="kh-hidden"
           />
         </div>
       </div>
@@ -137,7 +138,7 @@ export function AccountView({
       <div>
         <label
           htmlFor={`${fieldId}-name`}
-          className="block text-sm font-medium text-foreground mb-2"
+          className="kh-block kh-text-sm kh-font-medium kh-text-foreground kh-mb-2"
         >
           Name
         </label>
@@ -149,7 +150,7 @@ export function AccountView({
             nameEdited.current = true;
             setName(e.target.value);
           }}
-          className="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
+          className="kh-w-full kh-px-3 kh-py-2 kh-border kh-border-border kh-rounded-md kh-shadow-sm focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-ring focus:kh-border-ring kh-bg-background kh-text-foreground"
           placeholder="Enter your name"
         />
       </div>
@@ -161,38 +162,51 @@ export function AccountView({
       />
 
       {showIdentifiers && (
-        <dl className="text-xs text-muted-foreground space-y-1">
-          <div className="flex gap-2">
-            <dt className="font-medium">Keyhive id</dt>
-            <dd className="font-mono break-all">{self.id}</dd>
+        <dl className="kh-text-xs kh-text-muted-foreground kh-space-y-1">
+          <div className="kh-flex kh-gap-2">
+            <dt className="kh-font-medium">Keyhive id</dt>
+            <dd className="kh-font-mono kh-break-all">{self.id}</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="font-medium">Peer id</dt>
-            <dd className="font-mono break-all">{self.peerId}</dd>
+          <div className="kh-flex kh-gap-2">
+            <dt className="kh-font-medium">Peer id</dt>
+            <dd className="kh-font-mono kh-break-all">{self.peerId}</dd>
           </div>
         </dl>
       )}
 
+      {!directory.writable && (
+        <p className="kh-text-sm kh-text-muted-foreground">
+          The name directory is read-only, so your name and avatar cannot be
+          changed here.
+        </p>
+      )}
+
+      {directory.notice && (
+        <p className="kh-text-xs kh-text-muted-foreground">
+          {directory.notice}
+        </p>
+      )}
+
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="kh-text-sm kh-text-destructive">
           {error}
         </p>
       )}
 
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="kh-flex kh-justify-end kh-space-x-3 kh-pt-4">
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary border border-border rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
+            className="kh-px-4 kh-py-2 kh-text-sm kh-font-medium kh-text-secondary-foreground kh-bg-secondary kh-border kh-border-border kh-rounded-md hover:kh-bg-accent focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring"
           >
             Cancel
           </button>
         )}
         <button
           type="submit"
-          disabled={!onSave || isSaving}
-          className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!directory.writable || isSaving}
+          className="kh-px-4 kh-py-2 kh-text-sm kh-font-medium kh-text-primary-foreground kh-bg-primary kh-border kh-border-transparent kh-rounded-md hover:kh-bg-primary/90 focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-offset-2 focus:kh-ring-ring disabled:kh-opacity-50 disabled:kh-cursor-not-allowed"
         >
           {isSaving ? "Saving..." : "Save"}
         </button>

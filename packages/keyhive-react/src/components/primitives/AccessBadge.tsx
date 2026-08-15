@@ -13,7 +13,7 @@ export interface AccessBadgeProps {
 export function AccessBadge({ access, className = "" }: AccessBadgeProps) {
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide bg-muted text-muted-foreground border border-border ${className}`}
+      className={`kh-inline-block kh-px-2 kh-py-0.5 kh-rounded kh-text-xs kh-font-medium kh-uppercase kh-tracking-wide kh-bg-muted kh-text-muted-foreground kh-border kh-border-border ${className}`}
     >
       {access}
     </span>

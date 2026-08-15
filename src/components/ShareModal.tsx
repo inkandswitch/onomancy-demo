@@ -1,14 +1,13 @@
 import { AutomergeUrl } from "@automerge/react/slim";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import { Modal, PermissionsEditor } from "keyhive-react";
+import { keyhiveRuntime } from "../keyhiveRuntime";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
-import { Phonebook } from "../phonebook";
 import * as syncServer from "../syncServer";
 
 interface ShareModalProps {
   isOpen: boolean;
   docUrl: AutomergeUrl;
-  phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
   keyhiveVersion: number;
   onClose: () => void;
@@ -17,7 +16,6 @@ interface ShareModalProps {
 export function ShareModal({
   isOpen,
   docUrl,
-  phonebook,
   hive,
   keyhiveVersion,
   onClose,
@@ -25,9 +23,9 @@ export function ShareModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Share this list">
       <PermissionsEditor
+        runtime={keyhiveRuntime}
         hive={hive}
         docUrl={docUrl}
-        contacts={phonebook}
         refreshToken={keyhiveVersion}
         enabled={isOpen}
         labelForMember={(member) =>

@@ -178,7 +178,7 @@ export const DocumentList = ({
 // access, without a page reload.
 const DocumentTitle: React.FC<{ docUrl: AutomergeUrl }> = React.memo(
   ({ docUrl }) => {
-    useReRenderOnDocProgress(docUrl);
+    useReRenderOnDocProgress(useRepo(), docUrl);
     const [doc] = useDocument<TaskList>(docUrl);
 
     if (!doc) {

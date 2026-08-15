@@ -4,22 +4,24 @@ import blankAvatarImg from "../assets/blankavatar.jpeg";
 import {
   isValidAutomergeUrl,
   type AutomergeUrl,
-  type PeerId,
   useDocument,
+  useRepo,
 } from "@automerge/react/slim";
 import { TaskList } from "./TaskList";
 import { DocumentList } from "./DocumentList";
 import { useHash } from "react-use";
-import { useCallback, useEffect, useState } from "react";
-import { Phonebook, PHONEBOOK_URL } from "../phonebook";
+import { useEffect, useState } from "react";
+import { Phonebook, PHONEBOOK_NOTICE, PHONEBOOK_URL } from "../phonebook";
 import {
   AccountView,
   Avatar,
+  DirectoryProvider,
   Modal,
+  useAutomergeDocDirectory,
+  useDirectoryEntry,
   useKeyhiveUpdates,
   useReRenderOnDocProgress,
   useSelfIdentity,
-  type Contact,
 } from "keyhive-react";
 import {
   AutomergeRepoKeyhive,
@@ -35,41 +37,23 @@ type AppProps = {
   automergeRepoKeyhive: AutomergeRepoKeyhive;
 };
 
+/** Builds the name directory everything renders peers through. */
 function App({ docUrl, automergeRepoKeyhive }: AppProps) {
-  const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
-  const self = useSelfIdentity(automergeRepoKeyhive);
-
   // The phonebook syncs from the server or is created locally on first run.
   // Watching its progress makes names appear without a reload.
-  useReRenderOnDocProgress(PHONEBOOK_URL);
+  useReRenderOnDocProgress(useRepo(), PHONEBOOK_URL);
   const [phonebook, changePhonebook] = useDocument<Phonebook>(PHONEBOOK_URL);
 
-  const saveContact = useCallback(
-    (id: string, contact: Contact) => {
-      changePhonebook?.((doc) => {
-        const existing = doc[id];
-        if (!existing) {
-          doc[id] = {
-            peerId: contact.peerId as PeerId,
-            name: contact.name,
-            avatar: contact.avatar ?? null,
-          };
-          return;
-        }
-        if (contact.name !== undefined) existing.name = contact.name;
-        if (contact.avatar !== undefined) {
-          existing.avatar = contact.avatar ?? null;
-        }
-      });
-    },
-    [changePhonebook]
-  );
+  const directory = useAutomergeDocDirectory(phonebook, changePhonebook, {
+    source: "phonebook",
+    notice: PHONEBOOK_NOTICE,
+  });
 
   // Give the sync server an avatar so it is recognizable in the member list.
   // Its name comes from syncServer.DISPLAY_NAME, since ARK already tells us
   // which member it is.
   useEffect(() => {
-    if (!phonebook || !changePhonebook) return;
+    if (!phonebook || !directory.publish) return;
     const serverContactCard = ContactCard.fromJson(
       syncServer.CONTACT_CARD_JSON
     );
@@ -79,17 +63,28 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
     fetch(halAvatarUrl)
       .then((res) => res.arrayBuffer())
       .then((buffer) => {
-        changePhonebook((doc) => {
-          doc[serverHexId] = {
-            peerId: syncServer.PEER_ID,
-            avatar: new Uint8Array(buffer),
-          };
+        void directory.publish?.({
+          id: serverHexId,
+          peerId: syncServer.PEER_ID,
+          avatar: new Uint8Array(buffer),
         });
       })
       .catch((error) => {
         log.error("Could not load the sync server avatar:", error);
       });
-  }, [phonebook, changePhonebook]);
+  }, [phonebook, directory]);
+
+  return (
+    <DirectoryProvider directory={directory}>
+      <AppShell docUrl={docUrl} automergeRepoKeyhive={automergeRepoKeyhive} />
+    </DirectoryProvider>
+  );
+}
+
+function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
+  const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
+  const self = useSelfIdentity(automergeRepoKeyhive);
+  const selfEntry = useDirectoryEntry(self.id);
 
   const [hash, setHash] = useHash();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -98,8 +93,6 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
     cleanHash && isValidAutomergeUrl(cleanHash)
       ? (cleanHash as AutomergeUrl)
       : null;
-
-  const selfEntry = phonebook?.[self.id];
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -139,7 +132,6 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
             <ErrorBoundary key={selectedDocUrl}>
               <TaskList
                 docUrl={selectedDocUrl}
-                phonebook={phonebook}
                 hive={automergeRepoKeyhive}
                 keyhiveVersion={keyhiveVersion}
               />
@@ -159,8 +151,6 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
       >
         <AccountView
           hive={automergeRepoKeyhive}
-          contacts={phonebook}
-          onSave={saveContact}
           onSaved={() => setIsAccountModalOpen(false)}
           onCancel={() => setIsAccountModalOpen(false)}
           fallbackAvatarSrc={blankAvatarImg}

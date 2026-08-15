@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useRepo, type AutomergeUrl } from "@automerge/react/slim";
+import { useEffect, useState } from "react";
 import type { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 
 // Keyhive emits a burst of events for one logical change, so coalesce them.
@@ -35,20 +34,4 @@ export function useKeyhiveUpdates(hive: AutomergeRepoKeyhive): number {
   }, [hive]);
 
   return version;
-}
-
-/**
- * Re-render as a document's availability changes.
- *
- * Opening a document you have not been granted access to leaves the repo's
- * query unavailable. Granting access transitions it back to ready and fires
- * this subscription, so the document appears without a reload.
- */
-export function useReRenderOnDocProgress(docUrl: AutomergeUrl): void {
-  const repo = useRepo();
-  const query = useMemo(() => repo.findWithProgress(docUrl), [repo, docUrl]);
-  useSyncExternalStore(
-    (onChange) => query.subscribe(onChange),
-    () => query.peek().state
-  );
 }

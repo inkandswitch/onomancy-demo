@@ -1,10 +1,7 @@
 import { useMemo } from "react";
-import {
-  uint8ArrayToHex,
-  verifyingKeyPeerIdWithoutSuffix,
-  type AutomergeRepoKeyhiveBase,
-} from "@automerge/automerge-repo-keyhive";
+import type { AutomergeRepoKeyhiveBase } from "@automerge/automerge-repo-keyhive";
 import type { PeerId } from "@automerge/react/slim";
+import { bytesToHex, peerIdWithoutSuffix } from "../bytes";
 
 /** Either hive. `peerId` is on the concrete hives, not on the base. */
 export type KeyhiveHive = AutomergeRepoKeyhiveBase & {
@@ -25,8 +22,8 @@ export function useSelfIdentity(hive: KeyhiveHive): SelfIdentity {
   // identity.
   return useMemo(
     () => ({
-      id: uint8ArrayToHex(hive.active.individual.id.toBytes()),
-      peerId: verifyingKeyPeerIdWithoutSuffix(hive.peerId),
+      id: bytesToHex(hive.active.individual.id.toBytes()),
+      peerId: peerIdWithoutSuffix(hive.peerId),
       contactCardJson: hive.active.contactCard.toJson(),
     }),
     [hive]
