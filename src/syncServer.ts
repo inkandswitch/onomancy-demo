@@ -1,6 +1,8 @@
 import {
+  ContactCard,
   KEYHIVE_SYNC_SERVER_CONTACT_CARD_JSON,
   KEYHIVE_SYNC_SERVER_PEER_ID,
+  uint8ArrayToHex,
   type SyncServerSelection,
 } from "@automerge/automerge-repo-keyhive";
 import { PeerId } from "@automerge/automerge-repo/slim";
@@ -49,7 +51,17 @@ export const PEER_ID: PeerId = (
   isCustom ? __SYNC_SERVER_PEER_ID__ : KEYHIVE_SYNC_SERVER_PEER_ID
 ) as PeerId;
 
+// The server's hex-encoded keyhive id.
+let identifierHexCache: string | null | undefined;
+export function identifierHex(): string | undefined {
+  if (identifierHexCache === undefined) {
+    const card = ContactCard.fromJson(CONTACT_CARD_JSON);
+    identifierHexCache = card ? uint8ArrayToHex(card.individualId.bytes) : null;
+  }
+  return identifierHexCache ?? undefined;
+}
+
 // Shown wherever the sync server appears in the UI. ARK tags the sync server's
-// own membership entry (DocMember.isSyncServer), so the demo labels it from that
+// own membership entry (DocMember.isSyncServer) so the demo labels it from that
 // rather than from the phonebook.
 export const DISPLAY_NAME = "Demo Sync Server";

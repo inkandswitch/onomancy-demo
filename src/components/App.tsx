@@ -9,6 +9,7 @@ import {
 } from "@automerge/react/slim";
 import { TaskList } from "./TaskList";
 import { DocumentList } from "./DocumentList";
+import { GroupsPanel } from "./GroupsPanel";
 import { useHash } from "react-use";
 import { useEffect, useState } from "react";
 import { Phonebook, PHONEBOOK_NOTICE, PHONEBOOK_URL } from "../phonebook";
@@ -23,11 +24,7 @@ import {
   useReRenderOnDocProgress,
   useSelfIdentity,
 } from "keyhive-react";
-import {
-  AutomergeRepoKeyhive,
-  ContactCard,
-  uint8ArrayToHex,
-} from "@automerge/automerge-repo-keyhive";
+import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
 import { log } from "../log";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -54,12 +51,8 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
   // which member it is.
   useEffect(() => {
     if (!phonebook || !directory.publish) return;
-    const serverContactCard = ContactCard.fromJson(
-      syncServer.CONTACT_CARD_JSON
-    );
-    if (!serverContactCard) return;
-    const serverHexId = uint8ArrayToHex(serverContactCard.individualId.bytes);
-    if (phonebook[serverHexId]) return;
+    const serverHexId = syncServer.identifierHex();
+    if (!serverHexId || phonebook[serverHexId]) return;
     fetch(halAvatarUrl)
       .then((res) => res.arrayBuffer())
       .then((buffer) => {
@@ -96,12 +89,18 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
-      <div className="w-80 border-r border-border bg-card">
-        <DocumentList
-          docUrl={docUrl}
-          onSelectDocument={(url) => setHash(url ?? "")}
-          selectedDocument={selectedDocUrl}
+      <div className="w-80 border-r border-border bg-card flex flex-col">
+        <div className="flex-1 min-h-0">
+          <DocumentList
+            docUrl={docUrl}
+            onSelectDocument={(url) => setHash(url ?? "")}
+            selectedDocument={selectedDocUrl}
+            hive={automergeRepoKeyhive}
+          />
+        </div>
+        <GroupsPanel
           hive={automergeRepoKeyhive}
+          keyhiveVersion={keyhiveVersion}
         />
       </div>
 
