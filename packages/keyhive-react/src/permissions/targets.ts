@@ -33,6 +33,8 @@ export interface PermissionTarget {
   kind: "document" | "group";
   /** Stable string identifying the target for use as an effect dependency. */
   key: string;
+  /** Hex-encoded keyhive id of the document or group itself. */
+  subjectId: string;
   hive: AutomergeRepoKeyhiveBase;
   runtime: KeyhiveRuntime;
   supportsPublicAccess: boolean;
@@ -59,6 +61,18 @@ export interface PermissionTarget {
    */
   addAgent(agent: Agent, access: Access): Promise<void>;
   removeMember(memberId: string): Promise<void>;
+  /**
+   * Grant access to whoever a directory entry names, which is what picking
+   * someone out of a contact book does.
+   *
+   * Prefers the agent the local keyhive already holds, which is the only route
+   * for a group, and falls back to the entry's contact card. Throws when
+   * neither is available since a name alone carries no prekeys.
+   */
+  addDirectoryEntry(
+    entry: { id: string; contactCard?: string },
+    access: Access
+  ): Promise<void>;
   setPublicAccess(access: Access): Promise<void>;
   /** The direct delegations on this target. */
   listCapabilities(): Promise<Capability[]>;
@@ -66,6 +80,37 @@ export interface PermissionTarget {
 
 export function publicIdHex(runtime: KeyhiveRuntime): string {
   return bytesToHex(runtime.Identifier.publicId().toBytes());
+}
+
+/** Shared implementation of {@link PermissionTarget.addDirectoryEntry}. */
+async function grantToDirectoryEntry(
+  runtime: KeyhiveRuntime,
+  hive: AutomergeRepoKeyhiveBase,
+  entry: { id: string; contactCard?: string },
+  access: Access,
+  grant: {
+    addAgent(agent: Agent, access: Access): Promise<void>;
+    addMember(contactCard: ContactCard, access: Access): Promise<void>;
+  }
+): Promise<void> {
+  const identifier = new runtime.Identifier(hexToBytes(entry.id));
+  const agent = await hive.keyhive.getAgent(identifier);
+  if (agent) {
+    await grant.addAgent(agent, access);
+    return;
+  }
+  if (entry.contactCard) {
+    const card = runtime.ContactCard.fromJson(entry.contactCard);
+    if (!card) {
+      throw new Error("That contact card could not be read.");
+    }
+    await grant.addMember(card, access);
+    return;
+  }
+  throw new Error(
+    "Keyhive does not know this contact, and the directory holds no contact " +
+      "card for them. Paste their contact card instead."
+  );
 }
 
 export function agentKindOf(agent: {
@@ -104,9 +149,24 @@ export function createDocumentTarget(
   const isGeneratedOwnerGroup = (cap: Capability, docHex: string): boolean =>
     cap.who.isGroup() && bytesToHex(cap.proof.verifyingKey) === docHex;
 
+  const addMemberToDoc = async (contactCard: ContactCard, access: Access) => {
+    await hive.addMemberToDoc(docUrl, contactCard, access);
+  };
+
+  const addAgentToDoc = async (agent: Agent, access: Access) => {
+    const doc = await hive.keyhive.getDocument(
+      runtime.docIdFromAutomergeUrl(docUrl)
+    );
+    if (!doc) {
+      throw new Error("Document not found in keyhive. Has it synced yet?");
+    }
+    await hive.keyhive.addMember(agent, doc.toMembered(), access, []);
+  };
+
   return {
     kind: "document",
     key: docUrl,
+    subjectId: docIdHex(),
     hive,
     runtime,
     supportsPublicAccess: true,
@@ -154,18 +214,15 @@ export function createDocumentTarget(
       return reachable.find((member) => member.isSelf)?.access;
     },
 
-    async addMember(contactCard, access) {
-      await hive.addMemberToDoc(docUrl, contactCard, access);
-    },
+    addMember: addMemberToDoc,
 
-    async addAgent(agent, access) {
-      const doc = await hive.keyhive.getDocument(
-        runtime.docIdFromAutomergeUrl(docUrl)
-      );
-      if (!doc) {
-        throw new Error("Document not found in keyhive. Has it synced yet?");
-      }
-      await hive.keyhive.addMember(agent, doc.toMembered(), access, []);
+    addAgent: addAgentToDoc,
+
+    async addDirectoryEntry(entry, access) {
+      await grantToDirectoryEntry(runtime, hive, entry, access, {
+        addAgent: addAgentToDoc,
+        addMember: addMemberToDoc,
+      });
     },
 
     async removeMember(memberId) {
@@ -207,9 +264,23 @@ export function createGroupTarget(
     return agent;
   };
 
+  const addAgentToGroup = async (agent: Agent, access: Access) => {
+    await hive.keyhive.addMember(agent, group.toMembered(), access, []);
+  };
+
+  const addMemberToGroup = async (contactCard: ContactCard, access: Access) => {
+    await hive.receiveContactCard(contactCard);
+    const agent = await hive.keyhive.getAgent(contactCard.id);
+    if (!agent) {
+      throw new Error("That contact card did not resolve to a keyhive agent.");
+    }
+    await addAgentToGroup(agent, access);
+  };
+
   return {
     kind: "group",
     key: `group:${bytesToHex(group.id.toBytes())}`,
+    subjectId: bytesToHex(group.id.toBytes()),
     hive,
     runtime,
     supportsPublicAccess: true,
@@ -236,19 +307,15 @@ export function createGroupTarget(
         ?.can;
     },
 
-    async addMember(contactCard, access) {
-      await hive.receiveContactCard(contactCard);
-      const agent = await hive.keyhive.getAgent(contactCard.id);
-      if (!agent) {
-        throw new Error(
-          "That contact card did not resolve to a keyhive agent."
-        );
-      }
-      await hive.keyhive.addMember(agent, group.toMembered(), access, []);
-    },
+    addMember: addMemberToGroup,
 
-    async addAgent(agent, access) {
-      await hive.keyhive.addMember(agent, group.toMembered(), access, []);
+    addAgent: addAgentToGroup,
+
+    async addDirectoryEntry(entry, access) {
+      await grantToDirectoryEntry(runtime, hive, entry, access, {
+        addAgent: addAgentToGroup,
+        addMember: addMemberToGroup,
+      });
     },
 
     async removeMember(memberId) {

@@ -4,6 +4,7 @@ export { bytesToHex, hexToBytes, peerIdWithoutSuffix } from "./bytes";
 
 export type {
   DirectoryEntry,
+  DirectoryEntryKind,
   DirectoryTrust,
   NameDirectory,
 } from "./directory/types";
@@ -47,7 +48,11 @@ export { useSelfIdentity } from "./hooks/useSelfIdentity";
 export type { KeyhiveHive, SelfIdentity } from "./hooks/useSelfIdentity";
 
 export { AccountView } from "./components/AccountView";
+export { ContactBook } from "./components/ContactBook";
+export { ProfileEditor } from "./components/ProfileEditor";
 export type { AccountViewProps } from "./components/AccountView";
+export type { ContactBookProps } from "./components/ContactBook";
+export type { ProfileEditorProps } from "./components/ProfileEditor";
 export { DirectoryProvider } from "./components/DirectoryProvider";
 export type { DirectoryProviderProps } from "./components/DirectoryProvider";
 export { PermissionsEditor } from "./components/PermissionsEditor";

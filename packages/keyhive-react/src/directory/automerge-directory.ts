@@ -1,4 +1,9 @@
-import type { DirectoryEntry, DirectoryTrust, NameDirectory } from "./types";
+import type {
+  DirectoryEntry,
+  DirectoryEntryKind,
+  DirectoryTrust,
+  NameDirectory,
+} from "./types";
 
 /** Hex-encoded keyhive id to display information. */
 export type DirectoryDoc = Record<
@@ -7,6 +12,8 @@ export type DirectoryDoc = Record<
     peerId?: string;
     name?: string;
     avatar?: Uint8Array | null;
+    kind?: DirectoryEntryKind;
+    contactCard?: string;
   }
 >;
 
@@ -60,6 +67,9 @@ export function createAutomergeDocDirectory(
           if (entry.peerId !== undefined) record.peerId = entry.peerId;
           if (entry.name !== undefined) record.name = entry.name;
           if (entry.avatar !== undefined) record.avatar = entry.avatar ?? null;
+          if (entry.kind !== undefined) record.kind = entry.kind;
+          if (entry.contactCard !== undefined)
+            record.contactCard = entry.contactCard;
           d[entry.id] = record;
           return;
         }
@@ -67,6 +77,9 @@ export function createAutomergeDocDirectory(
         if (entry.peerId !== undefined) existing.peerId = entry.peerId;
         if (entry.name !== undefined) existing.name = entry.name;
         if (entry.avatar !== undefined) existing.avatar = entry.avatar ?? null;
+        if (entry.kind !== undefined) existing.kind = entry.kind;
+        if (entry.contactCard !== undefined)
+          existing.contactCard = entry.contactCard;
       });
     };
   }

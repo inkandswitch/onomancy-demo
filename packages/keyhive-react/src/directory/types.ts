@@ -1,6 +1,9 @@
 /** Whether a directory's names are self-asserted or proven. */
 export type DirectoryTrust = "unverified" | "verified";
 
+/** What an entry's id refers to. Groups are named here like individuals are. */
+export type DirectoryEntryKind = "individual" | "group";
+
 /** Display information for one keyhive identity. */
 export interface DirectoryEntry {
   /** Hex-encoded keyhive identifier, as `listMembers` returns it. */
@@ -8,6 +11,13 @@ export interface DirectoryEntry {
   name?: string;
   avatar?: Uint8Array | null;
   peerId?: string;
+  /** Absent in entries written before directories recorded it. */
+  kind?: DirectoryEntryKind;
+  /**
+   * JSON contact card, so someone found by name can be granted access without
+   * needing to paste one in. Individuals only since a group has no card.
+   */
+  contactCard?: string;
 }
 
 export interface NameDirectory {

@@ -153,6 +153,7 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
           hive={automergeRepoKeyhive}
           onSaved={() => setIsAccountModalOpen(false)}
           onCancel={() => setIsAccountModalOpen(false)}
+          publishContactCard
           fallbackAvatarSrc={blankAvatarImg}
         />
       </Modal>

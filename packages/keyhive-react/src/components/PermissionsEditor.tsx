@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { shortId, useDirectory } from "../directory/context";
-import type { NameDirectory } from "../directory/types";
+import type { DirectoryEntry, NameDirectory } from "../directory/types";
 import {
   grantableLevels,
   type PermissionTarget,
   type TargetMember,
 } from "../permissions/targets";
 import { useTargetMembers } from "../permissions/useTargetMembers";
+import { ContactBook } from "./ContactBook";
 import { AccessBadge } from "./primitives/AccessBadge";
 import { Avatar } from "./primitives/Avatar";
 
@@ -23,6 +24,12 @@ export interface PermissionsEditorProps {
   /** Label for a member the directory does not know, such as a sync server. */
   labelForMember?: (member: TargetMember) => string | undefined;
   showPublicAccess?: boolean;
+  /**
+   * Offer a search over the name directory, so a person or group can be picked
+   * by name instead of by pasting a contact card. Ignored when the directory
+   * cannot be listed.
+   */
+  showContactBook?: boolean;
   /** Renders a per-member button that calls this. */
   onInspectMember?: (memberId: string) => void;
   /** The level "Make Public" grants. Default `"edit"`. */
@@ -57,6 +64,7 @@ export function PermissionsEditor({
   enabled = true,
   labelForMember,
   showPublicAccess = true,
+  showContactBook = true,
   onInspectMember,
   publicAccessLevel = "edit",
   fallbackAvatarSrc,
@@ -98,6 +106,12 @@ export function PermissionsEditor({
       setSelectedLevel(delegationOptions[delegationOptions.length - 1]);
     }
   }, [delegationOptions, selectedLevel]);
+
+  // A group cannot be added to itself, and neither can a document.
+  const memberIds = useMemo(
+    () => [target.subjectId, ...members.map((m) => m.id)],
+    [members, target.subjectId]
+  );
 
   const sortedMembers = useMemo(
     () =>
@@ -143,6 +157,12 @@ export function PermissionsEditor({
     });
   };
 
+  const handlePick = (entry: DirectoryEntry) => {
+    void run(`share ${noun}`, () =>
+      target.addDirectoryEntry(entry, runtime.Access.fromString(selectedLevel))
+    );
+  };
+
   return (
     <div className={className}>
       {canDelegate && (
@@ -177,6 +197,21 @@ export function PermissionsEditor({
             </button>
           </div>
         </form>
+      )}
+
+      {canDelegate && showContactBook && directory.enumerable && (
+        <div className="kh-mb-6">
+          <h3 className="kh-text-sm kh-font-medium kh-text-foreground kh-mb-2">
+            Or pick from your contacts
+          </h3>
+          <ContactBook
+            onSelect={handlePick}
+            excludeIds={memberIds}
+            placeholder="Search contacts by name"
+            emptyMessage="No names yet. Contacts appear here once someone is named."
+            fallbackAvatarSrc={fallbackAvatarSrc}
+          />
+        </div>
       )}
 
       {(error || loadError) && (

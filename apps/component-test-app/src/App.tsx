@@ -6,10 +6,12 @@ import type {
 } from "@automerge/automerge-repo-keyhive";
 import {
   AccountView,
+  bytesToHex,
   createDocumentTarget,
   createGroupTarget,
   DirectoryProvider,
   PermissionsEditor,
+  ProfileEditor,
   useKeyhiveUpdates,
 } from "keyhive-react";
 import { DocumentPanel, LoadDocument } from "./DocumentPanel";
@@ -117,7 +119,7 @@ function TestApp({ hive, repo }: AppProps) {
           Names are written to a localStorage directory rather than a shared
           document.
         </p>
-        <AccountView hive={hive} />
+        <AccountView hive={hive} publishContactCard />
       </section>
 
       <section>
@@ -155,11 +157,16 @@ function TestApp({ hive, repo }: AppProps) {
 
       <section>
         <h2>Group access</h2>
-        <p className="hint">
-          Set access levels of members in a group.
-        </p>
-        {groupTarget ? (
+        <p className="hint">Set access levels of members in a group.</p>
+        {groupTarget && group ? (
           <>
+            <ProfileEditor
+              id={bytesToHex(group.id.toBytes())}
+              kind="group"
+              nameLabel="Group name"
+              namePlaceholder="Name this group"
+              saveLabel="Save group"
+            />
             <PermissionsEditor
               target={groupTarget}
               refreshToken={keyhiveVersion}

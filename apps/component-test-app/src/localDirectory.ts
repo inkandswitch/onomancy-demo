@@ -1,4 +1,8 @@
-import type { DirectoryEntry, NameDirectory } from "keyhive-react";
+import type {
+  DirectoryEntry,
+  DirectoryEntryKind,
+  NameDirectory,
+} from "keyhive-react";
 
 /**
  * A name directory kept in localStorage. Its contents live outside React so it
@@ -12,6 +16,8 @@ interface StoredEntry {
   name?: string;
   peerId?: string;
   avatarBase64?: string;
+  kind?: DirectoryEntryKind;
+  contactCard?: string;
 }
 
 type StoredDirectory = Record<string, StoredEntry>;
@@ -60,6 +66,8 @@ export function createLocalDirectory(): NameDirectory {
       name: record.name,
       peerId: record.peerId,
       avatar: decodeAvatar(record.avatarBase64),
+      kind: record.kind,
+      contactCard: record.contactCard,
     };
   }
 
@@ -101,6 +109,9 @@ export function createLocalDirectory(): NameDirectory {
           ? bytesToBase64(entry.avatar)
           : undefined;
       }
+      if (entry.kind !== undefined) record.kind = entry.kind;
+      if (entry.contactCard !== undefined)
+        record.contactCard = entry.contactCard;
       stored = { ...stored, [entry.id]: record };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
       notify();
