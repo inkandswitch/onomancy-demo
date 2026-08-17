@@ -7,6 +7,7 @@ import {
   PermissionsEditor,
   useKeyhiveUpdates,
 } from "keyhive-react";
+import { DocumentPanel, LoadDocument } from "./DocumentPanel";
 import { createLocalDirectory } from "./localDirectory";
 import { keyhiveRuntime } from "./keyhiveRuntime";
 
@@ -76,6 +77,27 @@ function Gallery({ hive, repo }: AppProps) {
       </section>
 
       <section>
+        <h2>Document</h2>
+        {docUrl ? (
+          <DocumentPanel
+            hive={hive}
+            docUrl={docUrl}
+            keyhiveVersion={keyhiveVersion}
+          />
+        ) : (
+          <>
+            <p className="hint">
+              Create a new document or load one another profile has shared.
+            </p>
+            <button type="button" onClick={() => void createDocument()}>
+              Create a document
+            </button>
+          </>
+        )}
+        <LoadDocument onLoad={setDocUrl} />
+      </section>
+
+      <section>
         <h2>Document permissions</h2>
         {docUrl ? (
           <PermissionsEditor
@@ -85,9 +107,7 @@ function Gallery({ hive, repo }: AppProps) {
             refreshToken={keyhiveVersion}
           />
         ) : (
-          <button type="button" onClick={() => void createDocument()}>
-            Create a document
-          </button>
+          <p className="hint">No document yet.</p>
         )}
       </section>
     </div>
