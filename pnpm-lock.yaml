@@ -101,7 +101,7 @@ importers:
         specifier: ^5.4.20
         version: 5.4.21
 
-  apps/component-gallery:
+  apps/component-test-app:
     dependencies:
       '@automerge/automerge':
         specifier: 3.3.0-fragments.1

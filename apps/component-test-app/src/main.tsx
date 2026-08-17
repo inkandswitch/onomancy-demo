@@ -14,12 +14,12 @@ import "./app.css";
 import App from "./App";
 
 async function start() {
-  const storage = new IndexedDBStorageAdapter("keyhive-gallery");
+  const storage = new IndexedDBStorageAdapter("keyhive-test-app");
 
   const { hive, repo } = await initializeAutomergeRepoKeyhive({
     createRepo: (config) => new Repo(config),
     storage,
-    peerIdSuffix: "keyhive-gallery",
+    peerIdSuffix: "keyhive-test-app",
     automaticArchiveIngestion: true,
     cachingMode: "periodic",
     syncServer: "keyhive",

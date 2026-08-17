@@ -12,7 +12,7 @@ import type {
 } from "@automerge/automerge-repo-keyhive";
 import { CopyableField, useReRenderOnDocProgress } from "keyhive-react";
 
-export interface GalleryDoc {
+export interface TestAppDoc {
   title: string;
 }
 
@@ -31,7 +31,7 @@ export function DocumentPanel({
   keyhiveVersion,
 }: DocumentPanelProps) {
   useReRenderOnDocProgress(useRepo(), docUrl);
-  const [doc, changeDoc] = useDocument<GalleryDoc>(docUrl);
+  const [doc, changeDoc] = useDocument<TestAppDoc>(docUrl);
   const [access, setAccess] = useState<Access | undefined>();
   const [checked, setChecked] = useState(false);
 

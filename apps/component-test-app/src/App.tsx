@@ -17,7 +17,7 @@ interface AppProps {
 }
 
 /**
- * A gallery for the keyhive-react components, and a second consumer of the
+ * A test app for the keyhive-react components, and a second consumer of the
  * package with no phonebook, no Tailwind configuration, and no shared code.
  */
 export default function App({ hive, repo }: AppProps) {
@@ -26,12 +26,12 @@ export default function App({ hive, repo }: AppProps) {
 
   return (
     <DirectoryProvider directory={directory}>
-      <Gallery hive={hive} repo={repo} />
+      <TestApp hive={hive} repo={repo} />
     </DirectoryProvider>
   );
 }
 
-function Gallery({ hive, repo }: AppProps) {
+function TestApp({ hive, repo }: AppProps) {
   const keyhiveVersion = useKeyhiveUpdates(hive);
   const [docUrl, setDocUrl] = useState<AutomergeUrl | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ function Gallery({ hive, repo }: AppProps) {
     setError(null);
     try {
       const handle = await repo.create2<{ title: string }>({
-        title: "Gallery document",
+        title: "Test app document",
       });
       await hive.addSyncServerRelayToDoc(handle.url);
       setDocUrl(handle.url);
@@ -54,7 +54,7 @@ function Gallery({ hive, repo }: AppProps) {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>keyhive-react gallery</h1>
+        <h1>keyhive-react test app</h1>
         <p>
           A second consumer of the component library. No phonebook, no Tailwind
           setup, no shared code with the TODO demo.

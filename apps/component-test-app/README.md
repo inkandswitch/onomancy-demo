@@ -1,4 +1,4 @@
-# Component gallery
+# Component test app
 
 A second consumer of [`keyhive-react`](../../packages/keyhive-react), sharing
 no code with the TODO demo and differing from it everywhere the demo could have
@@ -16,7 +16,7 @@ been relying on the components:
 
 ```
 pnpm install
-pnpm --filter component-gallery dev
+pnpm --filter component-test-app dev
 ```
 
 It opens at http://localhost:5558 and builds the library first. There is no

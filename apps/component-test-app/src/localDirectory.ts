@@ -5,7 +5,7 @@ import type { DirectoryEntry, NameDirectory } from "keyhive-react";
  * notifies through `subscribe`.
  */
 
-const STORAGE_KEY = "keyhive-gallery-directory";
+const STORAGE_KEY = "keyhive-test-app-directory";
 
 /** Avatars are bytes and localStorage holds strings, so this uses base64. */
 interface StoredEntry {

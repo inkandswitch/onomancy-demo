@@ -113,7 +113,7 @@ export default [
           "./tsconfig.json",
           "./tsconfig.node.json",
           "./packages/keyhive-react/tsconfig.json",
-          "./apps/component-gallery/tsconfig.json",
+          "./apps/component-test-app/tsconfig.json",
         ],
       },
     },
