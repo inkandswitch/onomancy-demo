@@ -1,5 +1,6 @@
 import type {
   Access,
+  Agent,
   AutomergeRepoKeyhiveBase,
   Capability,
   ContactCard,
@@ -36,7 +37,17 @@ export interface PermissionTarget {
   runtime: KeyhiveRuntime;
   supportsPublicAccess: boolean;
   listMembers(): Promise<TargetMember[]>;
+  /**
+   * Grant access to an individual. A contact card carries the prekeys needed
+   * to encrypt to someone the local keyhive has not met.
+   */
   addMember(contactCard: ContactCard, access: Access): Promise<void>;
+  /**
+   * Grant access to an agent the local keyhive already holds, which is how a
+   * group is added. Groups have no contact card and their members' prekeys
+   * are already known.
+   */
+  addAgent(agent: Agent, access: Access): Promise<void>;
   removeMember(memberId: string): Promise<void>;
   setPublicAccess(access: Access): Promise<void>;
   /** The direct delegations on this target. */
@@ -113,6 +124,16 @@ export function createDocumentTarget(
       await hive.addMemberToDoc(docUrl, contactCard, access);
     },
 
+    async addAgent(agent, access) {
+      const doc = await hive.keyhive.getDocument(
+        runtime.docIdFromAutomergeUrl(docUrl)
+      );
+      if (!doc) {
+        throw new Error("Document not found in keyhive. Has it synced yet?");
+      }
+      await hive.keyhive.addMember(agent, doc.toMembered(), access, []);
+    },
+
     async removeMember(memberId) {
       await hive.revokeMemberFromDoc(docUrl, memberId);
     },
@@ -183,6 +204,10 @@ export function createGroupTarget(
           "That contact card did not resolve to a keyhive agent."
         );
       }
+      await hive.keyhive.addMember(agent, group.toMembered(), access, []);
+    },
+
+    async addAgent(agent, access) {
       await hive.keyhive.addMember(agent, group.toMembered(), access, []);
     },
 

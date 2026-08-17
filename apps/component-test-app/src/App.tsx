@@ -79,6 +79,22 @@ function TestApp({ hive, repo }: AppProps) {
     [hive, group]
   );
 
+  const addGroupToDocument = useCallback(async () => {
+    setError(null);
+    if (!documentTarget || !group) return;
+    try {
+      // A group has no contact card so it is added as an agent.
+      await documentTarget.addAgent(
+        group.toAgent(),
+        keyhiveRuntime.Access.edit()
+      );
+    } catch (err) {
+      setError(
+        `Could not add the group: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }, [documentTarget, group]);
+
   return (
     <div className="page">
       <header className="page-header">
@@ -143,10 +159,20 @@ function TestApp({ hive, repo }: AppProps) {
           Set access levels of members in a group.
         </p>
         {groupTarget ? (
-          <PermissionsEditor
-            target={groupTarget}
-            refreshToken={keyhiveVersion}
-          />
+          <>
+            <PermissionsEditor
+              target={groupTarget}
+              refreshToken={keyhiveVersion}
+            />
+            <button
+              type="button"
+              className="plain-button"
+              disabled={!documentTarget}
+              onClick={() => void addGroupToDocument()}
+            >
+              Delegate this group edit access to the document
+            </button>
+          </>
         ) : (
           <button type="button" onClick={() => void createGroup()}>
             Create a group
