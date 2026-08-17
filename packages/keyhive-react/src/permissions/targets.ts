@@ -82,6 +82,22 @@ export function publicIdHex(runtime: KeyhiveRuntime): string {
   return bytesToHex(runtime.Identifier.publicId().toBytes());
 }
 
+interface TransitiveMember {
+  who: { id: { toBytes(): Uint8Array } };
+  can: Access;
+}
+
+function groupTransitiveMembers(
+  group: Group
+): Promise<TransitiveMember[]> | undefined {
+  const withTransitive = group as unknown as {
+    transitiveMembers?: () => Promise<TransitiveMember[]>;
+  };
+  return typeof withTransitive.transitiveMembers === "function"
+    ? withTransitive.transitiveMembers()
+    : undefined;
+}
+
 /** Shared implementation of {@link PermissionTarget.addDirectoryEntry}. */
 async function grantToDirectoryEntry(
   runtime: KeyhiveRuntime,
@@ -302,6 +318,13 @@ export function createGroupTarget(
     },
 
     async selfAccess() {
+      const transitive = groupTransitiveMembers(group);
+      if (transitive) {
+        const members = await transitive;
+        return members.find(
+          (member) => bytesToHex(member.who.id.toBytes()) === selfHex
+        )?.can;
+      }
       const caps = await group.members();
       return caps.find((cap) => bytesToHex(cap.who.id.toBytes()) === selfHex)
         ?.can;
