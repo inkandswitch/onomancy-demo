@@ -5,7 +5,7 @@ React components for applications that use keyhive.
 | Component | For |
 | --- | --- |
 | `AccountView` | Display name, avatar, and the local contact card |
-| `PermissionsEditor` | Adding and removing members on a document |
+| `PermissionsEditor` | Adding and removing members on a document or a group |
 | `DirectoryProvider` | Putting a name directory in scope |
 
 Plus `useKeyhiveUpdates`, `useReRenderOnDocProgress`, `useSelfIdentity` and
@@ -16,6 +16,7 @@ Plus `useKeyhiveUpdates`, `useReRenderOnDocProgress`, `useSelfIdentity` and
 ```tsx
 import * as ark from "@automerge/automerge-repo-keyhive";
 import {
+  createDocumentTarget,
   createKeyhiveRuntime,
   DirectoryProvider,
   PermissionsEditor,
@@ -27,14 +28,13 @@ const runtime = createKeyhiveRuntime(ark);
 
 function Share({ hive, docUrl, directory }) {
   const keyhiveVersion = useKeyhiveUpdates(hive);
+  const target = useMemo(
+    () => createDocumentTarget(runtime, hive, docUrl),
+    [hive, docUrl]
+  );
   return (
     <DirectoryProvider directory={directory}>
-      <PermissionsEditor
-        runtime={runtime}
-        hive={hive}
-        docUrl={docUrl}
-        refreshToken={keyhiveVersion}
-      />
+      <PermissionsEditor target={target} refreshToken={keyhiveVersion} />
     </DirectoryProvider>
   );
 }
@@ -43,6 +43,21 @@ function Share({ hive, docUrl, directory }) {
 Membership queries are async and keyhive has no per-document change
 notification, so components re-read when `refreshToken` changes. Subscribe once
 near the top of an app rather than per component.
+
+## Permission targets
+
+A document and a group involve different APIs, so `PermissionTarget` allows
+one editor to interact with either.
+
+```tsx
+const target = createDocumentTarget(runtime, hive, docUrl);
+const target = createGroupTarget(runtime, hive, group);
+```
+
+A group cannot be looked up from a stored id because `GroupId` has no public
+constructor, so hold the handle from `generateGroup`. On a document,
+`listMembers` reports the transitive closure, so a member holding access
+through a group is marked as such and Remove is hidden for them.
 
 ## The keyhive runtime
 

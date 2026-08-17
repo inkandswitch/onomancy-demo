@@ -1,8 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
-import type { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
+import type {
+  AutomergeRepoKeyhive,
+  Group,
+} from "@automerge/automerge-repo-keyhive";
 import {
   AccountView,
+  createDocumentTarget,
+  createGroupTarget,
   DirectoryProvider,
   PermissionsEditor,
   useKeyhiveUpdates,
@@ -34,6 +39,7 @@ export default function App({ hive, repo }: AppProps) {
 function TestApp({ hive, repo }: AppProps) {
   const keyhiveVersion = useKeyhiveUpdates(hive);
   const [docUrl, setDocUrl] = useState<AutomergeUrl | null>(null);
+  const [group, setGroup] = useState<Group | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const createDocument = useCallback(async () => {
@@ -50,6 +56,28 @@ function TestApp({ hive, repo }: AppProps) {
       );
     }
   }, [hive, repo]);
+
+  const createGroup = useCallback(async () => {
+    setError(null);
+    try {
+      // ARK does not currently expose group generation so this goes through
+      // the raw Keyhive.
+      setGroup(await hive.keyhive.generateGroup([]));
+    } catch (err) {
+      setError(
+        `Could not create a group: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }, [hive]);
+
+  const documentTarget = useMemo(
+    () => (docUrl ? createDocumentTarget(keyhiveRuntime, hive, docUrl) : null),
+    [hive, docUrl]
+  );
+  const groupTarget = useMemo(
+    () => (group ? createGroupTarget(keyhiveRuntime, hive, group) : null),
+    [hive, group]
+  );
 
   return (
     <div className="page">
@@ -98,16 +126,31 @@ function TestApp({ hive, repo }: AppProps) {
       </section>
 
       <section>
-        <h2>Document permissions</h2>
-        {docUrl ? (
+        <h2>Document access</h2>
+        {documentTarget ? (
           <PermissionsEditor
-            runtime={keyhiveRuntime}
-            hive={hive}
-            docUrl={docUrl}
+            target={documentTarget}
             refreshToken={keyhiveVersion}
           />
         ) : (
           <p className="hint">No document yet.</p>
+        )}
+      </section>
+
+      <section>
+        <h2>Group access</h2>
+        <p className="hint">
+          Set access levels of members in a group.
+        </p>
+        {groupTarget ? (
+          <PermissionsEditor
+            target={groupTarget}
+            refreshToken={keyhiveVersion}
+          />
+        ) : (
+          <button type="button" onClick={() => void createGroup()}>
+            Create a group
+          </button>
         )}
       </section>
     </div>

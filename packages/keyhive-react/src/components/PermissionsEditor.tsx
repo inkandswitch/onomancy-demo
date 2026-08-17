@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import type {
-  AutomergeRepoKeyhiveBase,
-  DocMember,
-} from "@automerge/automerge-repo-keyhive";
-import type { AutomergeUrl } from "@automerge/react/slim";
 import { shortId, useDirectory } from "../directory/context";
 import type { NameDirectory } from "../directory/types";
-import type { KeyhiveRuntime } from "../runtime";
+import {
+  grantableLevels,
+  type PermissionTarget,
+  type TargetMember,
+} from "../permissions/targets";
+import { useTargetMembers } from "../permissions/useTargetMembers";
 import { AccessBadge } from "./primitives/AccessBadge";
 import { Avatar } from "./primitives/Avatar";
 
 export interface PermissionsEditorProps {
-  runtime: KeyhiveRuntime;
-  hive: AutomergeRepoKeyhiveBase;
-  docUrl: AutomergeUrl;
+  /** The document or group whose membership is being edited. */
+  target: PermissionTarget;
   /**
    * Counter that triggers a re-read of the member list. Pass the value from
    * `useKeyhiveUpdates`.
@@ -22,8 +21,10 @@ export interface PermissionsEditorProps {
   /** Set false to stop loading, for example while a dialog is closed. */
   enabled?: boolean;
   /** Label for a member the directory does not know, such as a sync server. */
-  labelForMember?: (member: DocMember) => string | undefined;
+  labelForMember?: (member: TargetMember) => string | undefined;
   showPublicAccess?: boolean;
+  /** Renders a per-member button that calls this. */
+  onInspectMember?: (memberId: string) => void;
   /** The level "Make Public" grants. Default `"edit"`. */
   publicAccessLevel?: "relay" | "read" | "edit" | "admin";
   fallbackAvatarSrc?: string;
@@ -31,9 +32,9 @@ export interface PermissionsEditorProps {
 }
 
 function memberLabel(
-  member: DocMember,
+  member: TargetMember,
   directory: NameDirectory,
-  labelForMember?: (member: DocMember) => string | undefined
+  labelForMember?: (member: TargetMember) => string | undefined
 ): string {
   if (member.isPublic) return "Public";
   return (
@@ -44,60 +45,36 @@ function memberLabel(
 }
 
 /**
- * Add and remove members on a keyhive document at a chosen access level.
+ * Add and remove members on a keyhive document or group at a chosen access
+ * level.
  *
  * You can only delegate at levels at or below your own access levels. And only
- * an admin can revoke members.
+ * an admin can revoke members, and only where a revocation here takes effect.
  */
 export function PermissionsEditor({
-  runtime,
-  hive,
-  docUrl,
+  target,
   refreshToken = 0,
   enabled = true,
   labelForMember,
   showPublicAccess = true,
+  onInspectMember,
   publicAccessLevel = "edit",
   fallbackAvatarSrc,
   className = "",
 }: PermissionsEditorProps) {
   const directory = useDirectory();
-  const [members, setMembers] = useState<DocMember[]>([]);
-  const [isLoading, setIsLoading] = useState(enabled);
+  const runtime = target.runtime;
+  const {
+    members,
+    isLoading,
+    error: loadError,
+    refresh,
+  } = useTargetMembers(target, refreshToken, enabled);
+
   const [contactCardInput, setContactCardInput] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("Edit");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [reload, setReload] = useState(0);
-
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    setIsLoading(true);
-
-    void (async () => {
-      try {
-        const list = await hive.listMembers(docUrl);
-        if (!cancelled) {
-          setMembers(list);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setMembers([]);
-          setError(
-            err instanceof Error ? err.message : "Could not read the members."
-          );
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hive, docUrl, refreshToken, reload, enabled]);
 
   const myAccess = members.find((m) => m.isSelf)?.access;
   const publicMember = members.find((m) => m.isPublic);
@@ -108,13 +85,10 @@ export function PermissionsEditor({
   const canDelegate = myAccess?.isReader ?? false;
 
   // You can grant your own level or anything below it.
-  const delegationOptions = useMemo(() => {
-    if (!myAccess) return [];
-    const { Access } = runtime;
-    return [Access.relay(), Access.read(), Access.edit(), Access.admin()]
-      .filter((level) => myAccess.atLeast(level))
-      .map((level) => level.toString());
-  }, [runtime, myAccess]);
+  const delegationOptions = useMemo(
+    () => grantableLevels(runtime, myAccess).map((level) => level.toString()),
+    [runtime, myAccess]
+  );
 
   useEffect(() => {
     if (
@@ -142,7 +116,7 @@ export function PermissionsEditor({
       await task();
       // Keyhive will also fire an update, but a local action should show its
       // result without waiting for the debounce.
-      setReload((n) => n + 1);
+      refresh();
     } catch (err) {
       setError(
         `Could not ${taskDescription}: ${err instanceof Error ? err.message : String(err)}`
@@ -152,17 +126,19 @@ export function PermissionsEditor({
     }
   };
 
+  const noun = target.kind === "group" ? "group" : "document";
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const json = contactCardInput.trim();
     if (!json) return;
 
-    void run("share document", async () => {
+    void run(`share ${noun}`, async () => {
       const contactCard = runtime.ContactCard.fromJson(json);
       if (!contactCard) throw new Error("Not a valid contact card");
       // Throws on an unrecognized access level.
       const access = runtime.Access.fromString(selectedLevel);
-      await hive.addMemberToDoc(docUrl, contactCard, access);
+      await target.addMember(contactCard, access);
       setContactCardInput("");
     });
   };
@@ -203,23 +179,23 @@ export function PermissionsEditor({
         </form>
       )}
 
-      {error && (
+      {(error || loadError) && (
         <p role="alert" className="kh-mb-4 kh-text-sm kh-text-destructive">
-          {error}
+          {error ?? loadError}
         </p>
       )}
 
-      {showPublicAccess && (
+      {showPublicAccess && target.supportsPublicAccess && (
         <div className="kh-mb-6 kh-flex kh-items-center kh-justify-between kh-gap-3">
           <p className="kh-text-sm kh-text-foreground">
             {currentPublicAccess ? (
               <>
-                This document is <span className="kh-font-medium">public</span>{" "}
-                ({currentPublicAccess.toUpperCase()})
+                This {noun} is <span className="kh-font-medium">public</span> (
+                {currentPublicAccess.toUpperCase()})
               </>
             ) : (
               <>
-                This document is <span className="kh-font-medium">private</span>
+                This {noun} is <span className="kh-font-medium">private</span>
               </>
             )}
           </p>
@@ -228,10 +204,9 @@ export function PermissionsEditor({
               <button
                 onClick={() =>
                   // Making a document private revokes the public member.
-                  void run("make document private", async () => {
-                    if (publicMember) {
-                      await hive.revokeMemberFromDoc(docUrl, publicMember.id);
-                    }
+                  void run(`make ${noun} private`, async () => {
+                    if (publicMember)
+                      await target.removeMember(publicMember.id);
                   })
                 }
                 disabled={isBusy}
@@ -242,9 +217,8 @@ export function PermissionsEditor({
             ) : (
               <button
                 onClick={() =>
-                  void run("make document public", () =>
-                    hive.setPublicAccess(
-                      docUrl,
+                  void run(`make ${noun} public`, () =>
+                    target.setPublicAccess(
                       runtime.Access.fromString(publicAccessLevel)
                     )
                   )
@@ -290,37 +264,63 @@ export function PermissionsEditor({
                     <div className="kh-min-w-0">
                       <div className="kh-text-sm kh-font-medium kh-text-foreground kh-truncate">
                         {label}
+                        {member.kind === "group" && (
+                          <span className="kh-ml-2 kh-text-xs kh-text-muted-foreground">
+                            (group)
+                          </span>
+                        )}
                       </div>
-                      <AccessBadge access={member.access.toString()} />
+                      <div className="kh-flex kh-items-center kh-gap-2">
+                        <AccessBadge access={member.access.toString()} />
+                        {!member.isDirect && (
+                          <span className="kh-text-xs kh-text-muted-foreground">
+                            through a group
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {isAdmin && !member.isSelf && !member.isSyncServer && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void run("remove member", () =>
-                          hive.revokeMemberFromDoc(docUrl, member.id)
-                        )
-                      }
-                      disabled={isBusy}
-                      className="kh-text-muted-foreground hover:kh-text-destructive kh-transition-colors kh-p-1 disabled:kh-opacity-50 kh-shrink-0"
-                      aria-label={`Remove ${label}`}
-                    >
-                      <svg
-                        className="kh-w-4 kh-h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                  <div className="kh-flex kh-items-center kh-gap-1 kh-shrink-0">
+                    {onInspectMember && (
+                      <button
+                        type="button"
+                        onClick={() => onInspectMember(member.id)}
+                        className="kh-text-xs kh-text-muted-foreground hover:kh-text-foreground kh-transition-colors kh-px-2 kh-py-1"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  )}
+                        Why?
+                      </button>
+                    )}
+                    {isAdmin &&
+                      !member.isSelf &&
+                      !member.isSyncServer &&
+                      member.isDirect && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void run("remove member", () =>
+                              target.removeMember(member.id)
+                            )
+                          }
+                          disabled={isBusy}
+                          className="kh-text-muted-foreground hover:kh-text-destructive kh-transition-colors kh-p-1 disabled:kh-opacity-50 kh-shrink-0"
+                          aria-label={`Remove ${label}`}
+                        >
+                          <svg
+                            className="kh-w-4 kh-h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                  </div>
                 </div>
               );
             })

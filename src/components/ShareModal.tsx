@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { AutomergeUrl } from "@automerge/react/slim";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
-import { Modal, PermissionsEditor } from "keyhive-react";
+import { createDocumentTarget, Modal, PermissionsEditor } from "keyhive-react";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import * as syncServer from "../syncServer";
@@ -20,12 +21,15 @@ export function ShareModal({
   keyhiveVersion,
   onClose,
 }: ShareModalProps) {
+  const target = useMemo(
+    () => createDocumentTarget(keyhiveRuntime, hive, docUrl),
+    [hive, docUrl]
+  );
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Share this list">
       <PermissionsEditor
-        runtime={keyhiveRuntime}
-        hive={hive}
-        docUrl={docUrl}
+        target={target}
         refreshToken={keyhiveVersion}
         enabled={isOpen}
         labelForMember={(member) =>

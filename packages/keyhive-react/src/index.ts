@@ -24,6 +24,22 @@ export type {
 } from "./directory/automerge-directory";
 export { useAutomergeDocDirectory } from "./directory/useAutomergeDocDirectory";
 
+export {
+  agentKindOf,
+  createDocumentTarget,
+  createGroupTarget,
+  grantableLevels,
+  publicIdHex,
+} from "./permissions/targets";
+export type {
+  AgentKind,
+  GroupTargetOptions,
+  PermissionTarget,
+  TargetMember,
+} from "./permissions/targets";
+export { useTargetMembers } from "./permissions/useTargetMembers";
+export type { TargetMembersState } from "./permissions/useTargetMembers";
+
 export { useAvatarUrl } from "./hooks/useAvatarUrl";
 export { useKeyhiveUpdates } from "./hooks/useKeyhiveUpdates";
 export { useReRenderOnDocProgress } from "./hooks/useDocProgress";
