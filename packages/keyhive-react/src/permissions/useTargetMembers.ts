@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import type { Access } from "@automerge/automerge-repo-keyhive";
 import type { PermissionTarget, TargetMember } from "./targets";
 
 export interface TargetMembersState {
+  /** One entry per direct delegation. */
   members: TargetMember[];
+  /**
+   * This identity's effective access, including access held through a group,
+   * which has no entry in `members`.
+   */
+  selfAccess: Access | undefined;
   isLoading: boolean;
   error: string | null;
   refresh: () => void;
@@ -15,6 +22,7 @@ export function useTargetMembers(
   enabled: boolean = true
 ): TargetMembersState {
   const [members, setMembers] = useState<TargetMember[]>([]);
+  const [selfAccess, setSelfAccess] = useState<Access | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [manualRefresh, setManualRefresh] = useState(0);
@@ -28,13 +36,18 @@ export function useTargetMembers(
 
     void (async () => {
       try {
-        const list = await target.listMembers();
+        const [list, mine] = await Promise.all([
+          target.listMembers(),
+          target.selfAccess(),
+        ]);
         if (cancelled) return;
         setMembers(list);
+        setSelfAccess(mine);
         setError(null);
       } catch (err) {
         if (cancelled) return;
         setMembers([]);
+        setSelfAccess(undefined);
         setError(
           err instanceof Error ? err.message : "Could not read the member list."
         );
@@ -52,5 +65,5 @@ export function useTargetMembers(
 
   const refresh = useCallback(() => setManualRefresh((n) => n + 1), []);
 
-  return { members, isLoading, error, refresh };
+  return { members, selfAccess, isLoading, error, refresh };
 }

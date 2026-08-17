@@ -66,6 +66,7 @@ export function PermissionsEditor({
   const runtime = target.runtime;
   const {
     members,
+    selfAccess: myAccess,
     isLoading,
     error: loadError,
     refresh,
@@ -76,7 +77,6 @@ export function PermissionsEditor({
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
-  const myAccess = members.find((m) => m.isSelf)?.access;
   const publicMember = members.find((m) => m.isPublic);
   const currentPublicAccess = publicMember?.access.toString();
 

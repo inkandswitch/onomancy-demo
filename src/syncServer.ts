@@ -50,6 +50,6 @@ export const PEER_ID: PeerId = (
 ) as PeerId;
 
 // Shown wherever the sync server appears in the UI. ARK tags the sync server's
-// own membership row (DocMember.isSyncServer), so the demo labels it from that
+// own membership entry (DocMember.isSyncServer), so the demo labels it from that
 // rather than from the phonebook.
 export const DISPLAY_NAME = "Demo Sync Server";

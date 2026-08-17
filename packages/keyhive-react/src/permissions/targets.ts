@@ -20,7 +20,7 @@ export interface TargetMember {
   isPublic: boolean;
   isSyncServer: boolean;
   /** False when the member holds access through a group, where revoking here
-   * would not take it away. */
+   * would not take it away. Entries are direct unless a target says otherwise. */
   isDirect: boolean;
   kind: AgentKind;
 }
@@ -36,7 +36,17 @@ export interface PermissionTarget {
   hive: AutomergeRepoKeyhiveBase;
   runtime: KeyhiveRuntime;
   supportsPublicAccess: boolean;
+  /**
+   * Who this target is shared with, one entry per direct delegation. A group
+   * is one entry (individual group members are not listed here).
+   */
   listMembers(): Promise<TargetMember[]>;
+  /**
+   * This identity's effective access, which {@link listMembers} does not
+   * always show (e.g., when access is through a group). Undefined means no
+   * access at all.
+   */
+  selfAccess(): Promise<Access | undefined>;
   /**
    * Grant access to an individual. A contact card carries the prekeys needed
    * to encrypt to someone the local keyhive has not met.
@@ -70,8 +80,7 @@ export function agentKindOf(agent: {
 }
 
 /**
- * Membership of a keyhive document. `listMembers` reports the transitive
- * closure so the direct delegations are read separately to tell them apart.
+ * Membership of a keyhive document.
  */
 export function createDocumentTarget(
   runtime: KeyhiveRuntime,
@@ -86,6 +95,15 @@ export function createDocumentTarget(
     return doc ? await doc.members() : [];
   };
 
+  const docIdHex = () =>
+    bytesToHex(runtime.docIdFromAutomergeUrl(docUrl).toBytes());
+
+  /**
+   * Filter out original group generated with document.
+   */
+  const isGeneratedOwnerGroup = (cap: Capability, docHex: string): boolean =>
+    cap.who.isGroup() && bytesToHex(cap.proof.verifyingKey) === docHex;
+
   return {
     kind: "document",
     key: docUrl,
@@ -94,30 +112,46 @@ export function createDocumentTarget(
     supportsPublicAccess: true,
 
     async listMembers() {
-      const members = await hive.listMembers(docUrl);
-      // Nothing to compare against until the document is in keyhive.
-      let directIds: Set<string> | null = null;
+      // Individuals, whichever path their access came from (e.g., direct or group).
+      const reachable = await hive.listMembers(docUrl);
+      const flags = new Map(reachable.map((member) => [member.id, member]));
+
+      let caps: Capability[];
       try {
-        const caps = await capabilities();
-        if (caps.length > 0) {
-          directIds = new Set(
-            caps.map((cap) => bytesToHex(cap.who.id.toBytes()))
-          );
-        }
+        caps = await capabilities();
       } catch {
-        directIds = null;
+        caps = [];
+      }
+      if (caps.length === 0) {
+        return reachable.map((member) => ({
+          ...member,
+          isDirect: true,
+          kind: "individual" as const,
+        }));
       }
 
-      return members.map((member) => ({
-        id: member.id,
-        access: member.access,
-        isSelf: member.isSelf,
-        isPublic: member.isPublic,
-        isSyncServer: member.isSyncServer,
-        isDirect: directIds ? directIds.has(member.id) : true,
-        // listMembers is already filtered to individuals by keyhive.
-        kind: "individual" as const,
-      }));
+      const docHex = docIdHex();
+      return caps
+        .filter((cap) => !isGeneratedOwnerGroup(cap, docHex))
+        .map((cap) => {
+          const id = bytesToHex(cap.who.id.toBytes());
+          const flagged = flags.get(id);
+          const isSelf = flagged?.isSelf ?? false;
+          return {
+            id,
+            access: cap.can,
+            isSelf,
+            isPublic: flagged?.isPublic ?? false,
+            isSyncServer: flagged?.isSyncServer ?? false,
+            isDirect: true,
+            kind: isSelf ? ("individual" as const) : agentKindOf(cap.who),
+          };
+        });
+    },
+
+    async selfAccess() {
+      const reachable = await hive.listMembers(docUrl);
+      return reachable.find((member) => member.isSelf)?.access;
     },
 
     async addMember(contactCard, access) {
@@ -194,6 +228,12 @@ export function createGroupTarget(
           kind: agentKindOf(cap.who),
         };
       });
+    },
+
+    async selfAccess() {
+      const caps = await group.members();
+      return caps.find((cap) => bytesToHex(cap.who.id.toBytes()) === selfHex)
+        ?.can;
     },
 
     async addMember(contactCard, access) {
