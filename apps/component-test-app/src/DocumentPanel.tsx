@@ -10,7 +10,10 @@ import type {
   Access,
   AutomergeRepoKeyhive,
 } from "@automerge/automerge-repo-keyhive";
-import { CopyableField, useReRenderOnDocProgress } from "keyhive-react";
+import {
+  CopyableField,
+  useReRenderOnDocProgress,
+} from "@automerge/keyhive-react";
 
 export interface TestAppDoc {
   title: string;

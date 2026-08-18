@@ -11,7 +11,7 @@ import {
   AutomergeRepoKeyhive,
   isUnprotectedDoc,
 } from "@automerge/automerge-repo-keyhive";
-import { useReRenderOnDocProgress } from "keyhive-react";
+import { useReRenderOnDocProgress } from "@automerge/keyhive-react";
 import { TaskList as TaskListDoc } from "../taskListDoc";
 import { copyToClipboard } from "../clipboard";
 import { log } from "../log";

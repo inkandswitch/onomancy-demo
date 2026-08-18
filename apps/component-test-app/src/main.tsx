@@ -9,7 +9,7 @@ import { Repo } from "@automerge/automerge-repo";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
 import { RepoContext } from "@automerge/react/slim";
 // The only CSS the components need. This app has no Tailwind of its own.
-import "keyhive-react/styles.css";
+import "@automerge/keyhive-react/styles.css";
 import "./app.css";
 import App from "./App";
 

@@ -13,7 +13,7 @@ import {
   AccessEditor,
   ProfileEditor,
   useKeyhiveUpdates,
-} from "keyhive-react";
+} from "@automerge/keyhive-react";
 import { DocumentPanel, LoadDocument } from "./DocumentPanel";
 import { createLocalDirectory } from "./localDirectory";
 import { keyhiveRuntime } from "./keyhiveRuntime";

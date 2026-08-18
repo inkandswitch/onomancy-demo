@@ -23,7 +23,7 @@ import {
   useKeyhiveUpdates,
   useReRenderOnDocProgress,
   useSelfIdentity,
-} from "keyhive-react";
+} from "@automerge/keyhive-react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
 import { log } from "../log";
