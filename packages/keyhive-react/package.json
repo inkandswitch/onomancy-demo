@@ -1,0 +1,45 @@
+{
+  "name": "keyhive-react",
+  "private": true,
+  "version": "0.0.0",
+  "description": "WIP React components for keyhive access control.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/keyhive-react.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run build:js && pnpm run build:css && pnpm run check",
+    "build:js": "tsc -p tsconfig.build.json",
+    "build:css": "tailwindcss -c tailwind.config.js -i src/styles.css -o dist/keyhive-react.css --minify",
+    "check": "pnpm run check:isolation && pnpm run check:prefix",
+    "check:isolation": "node scripts/check-isolation.mjs",
+    "check:prefix": "node scripts/check-prefix.mjs",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@automerge/automerge-repo-keyhive": "0.5.0-alpha.3",
+    "@automerge/react": "2.6.0-subduction.40",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@automerge/automerge-repo-keyhive": "0.5.0-alpha.3",
+    "@automerge/react": "2.6.0-subduction.40",
+    "@types/react": "^18.3.25",
+    "react": "^18.3.1",
+    "typescript": "^5.9.2",
+    "tailwindcss": "^3.4.17"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

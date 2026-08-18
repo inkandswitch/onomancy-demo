@@ -1,20 +1,14 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { AutomergeUrl } from "@automerge/react/slim";
-import { Phonebook } from "../phonebook";
-import {
-  Access,
-  AutomergeRepoKeyhive,
-  ContactCard,
-  type DocMember,
-} from "@automerge/automerge-repo-keyhive";
+import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
+import { createDocumentTarget, Modal, AccessEditor } from "keyhive-react";
+import { keyhiveRuntime } from "../keyhiveRuntime";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import * as syncServer from "../syncServer";
-import { errorMessage, log } from "../log";
 
 interface ShareModalProps {
   isOpen: boolean;
   docUrl: AutomergeUrl;
-  phonebook: Phonebook | undefined;
   hive: AutomergeRepoKeyhive;
   keyhiveVersion: number;
   onClose: () => void;
@@ -23,378 +17,26 @@ interface ShareModalProps {
 export function ShareModal({
   isOpen,
   docUrl,
-  phonebook,
   hive,
   keyhiveVersion,
   onClose,
 }: ShareModalProps) {
-  const [userIdInput, setUserIdInput] = useState("");
-  const [selectedAccessLevel, setSelectedAccessLevel] = useState("Edit");
-  const [members, setMembers] = useState<DocMember[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoadingAccessList, setIsLoadingAccessList] = useState(true);
-
-  // The current user and the public member are just entries in the member
-  // list, tagged by listMembers.
-  const myAccess = members.find((m) => m.isSelf)?.access;
-  const publicMember = members.find((m) => m.isPublic);
-  const currentPublicAccess = publicMember?.access.toString();
-
-  // Admin is the top of the ordering, so "can administer" is atLeast(admin).
-  // Built once rather than per render: these are WASM values.
-  const adminAccess = useMemo(() => Access.admin(), []);
-  const isAdmin = myAccess?.atLeast(adminAccess) ?? false;
-
-  // You can grant your own access level or anything below it. Access values
-  // are ordered relay < read < edit < admin and know how to compare
-  // themselves, so the levels come from the API rather than from a list of
-  // names kept in step with it by hand.
-  const grantableLevels = useMemo(() => {
-    if (!myAccess) return [];
-    return [
-      Access.relay(),
-      Access.read(),
-      Access.edit(),
-      Access.admin(),
-    ].filter((level) => myAccess.atLeast(level));
-  }, [myAccess]);
-
-  // The <select> holds level names, since DOM values are strings. Keep it on
-  // a level the user can actually grant, defaulting to the highest.
-  const grantableNames = useMemo(
-    () => grantableLevels.map((level) => level.toString()),
-    [grantableLevels]
+  const target = useMemo(
+    () => createDocumentTarget(keyhiveRuntime, hive, docUrl),
+    [hive, docUrl]
   );
-  useEffect(() => {
-    if (
-      grantableNames.length > 0 &&
-      !grantableNames.includes(selectedAccessLevel)
-    ) {
-      setSelectedAccessLevel(grantableNames[grantableNames.length - 1]);
-    }
-  }, [grantableNames, selectedAccessLevel]);
-
-  const handleMakePublic = async () => {
-    setError(null);
-    try {
-      await hive.setPublicAccess(docUrl, Access.edit());
-    } catch (err) {
-      log.error("Error making document public:", err);
-      setError(`Could not make the list public: ${errorMessage(err)}`);
-    }
-  };
-
-  // Making a document private is just revoking the public member, the same way
-  // any other member is revoked.
-  const handleMakePrivate = async () => {
-    if (!publicMember) return;
-    setError(null);
-    try {
-      await hive.revokeMemberFromDoc(docUrl, publicMember.id);
-    } catch (err) {
-      log.error("Error making document private:", err);
-      setError(`Could not make the list private: ${errorMessage(err)}`);
-    }
-  };
-
-  const displayNameFor = useCallback(
-    (member: DocMember) => {
-      if (member.isPublic) return "Public";
-      if (member.isSyncServer) return syncServer.DISPLAY_NAME;
-      return phonebook?.[member.id]?.name || `0x${member.id.slice(0, 12)}...`;
-    },
-    [phonebook]
-  );
-
-  // Members sorted by display name. Memoized so an unrelated re-render does not
-  // re-sort (each comparison does a phonebook lookup).
-  const sortedMembers = useMemo(
-    () =>
-      [...members].sort((a, b) =>
-        displayNameFor(a).localeCompare(displayNameFor(b))
-      ),
-    [members, displayNameFor]
-  );
-
-  // Build blob URLs for member avatars once per member/phonebook change, and
-  // revoke them on cleanup so they are not leaked.
-  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const urls: Record<string, string> = {};
-    for (const member of members) {
-      const avatar = phonebook?.[member.id]?.avatar;
-      if (avatar) {
-        urls[member.id] = URL.createObjectURL(
-          new Blob([new Uint8Array(avatar)])
-        );
-      }
-    }
-    setAvatarUrls(urls);
-    return () => {
-      for (const url of Object.values(urls)) URL.revokeObjectURL(url);
-    };
-  }, [members, phonebook]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchMembers() {
-      if (!cancelled) {
-        setIsLoadingAccessList(true);
-      }
-
-      const list = await hive.listMembers(docUrl);
-      if (!cancelled) {
-        setMembers(list);
-        setIsLoadingAccessList(false);
-      }
-    }
-
-    if (isOpen) {
-      void fetchMembers();
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [keyhiveVersion, docUrl, hive, isOpen]);
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen, onClose]);
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const contactCardJson = userIdInput.trim();
-    if (!contactCardJson) return;
-
-    setError(null);
-    try {
-      const contactCard = ContactCard.fromJson(contactCardJson);
-      if (!contactCard) {
-        setError("Not a valid contact card.");
-        return;
-      }
-
-      // Throws on an unrecognized access level.
-      const access = Access.fromString(selectedAccessLevel);
-
-      await hive.addMemberToDoc(docUrl, contactCard, access);
-
-      setUserIdInput("");
-    } catch (err) {
-      log.error("Error adding user:", err);
-      setError(`Could not share the list: ${errorMessage(err)}`);
-    }
-  };
-
-  const handleRemoveUser = async (hexId: string) => {
-    setError(null);
-    try {
-      await hive.revokeMemberFromDoc(docUrl, hexId);
-    } catch (err) {
-      log.error("Error removing user:", err);
-      setError(`Could not remove that member: ${errorMessage(err)}`);
-    }
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 overflow-auto bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 transition-all duration-200"
-      onClick={handleBackdropClick}
-      style={{
-        animation: isOpen ? "fadeIn 0.2s ease-out" : undefined,
-      }}
-    >
-      <div
-        className="bg-card rounded-lg shadow-lg border border-border max-w-md w-full max-h-[90vh] overflow-auto transition-all duration-200 transform ring-1 ring-ring/20 ring-offset-2 ring-offset-background"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          animation: isOpen ? "slideIn 0.2s ease-out" : undefined,
-        }}
-      >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-foreground">
-              Share this list
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Close modal"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-
-          <form onSubmit={handleAddUser} className="mb-6">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={userIdInput}
-                onChange={(e) => setUserIdInput(e.target.value)}
-                placeholder="Contact Card"
-                className="flex-1 px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm bg-background text-foreground"
-              />
-              <select
-                value={selectedAccessLevel}
-                onChange={(e) => setSelectedAccessLevel(e.target.value)}
-                className="px-3 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring text-sm bg-background text-foreground"
-              >
-                {grantableNames.map((level) => (
-                  <option key={level} value={level}>
-                    {level.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border"
-              >
-                Add
-              </button>
-            </div>
-            {error && (
-              <p role="alert" className="mt-2 text-sm text-destructive">
-                {error}
-              </p>
-            )}
-          </form>
-
-          <div className="mb-6 flex items-center justify-between">
-            <p className="text-sm text-foreground">
-              {currentPublicAccess ? (
-                <>
-                  This list is <span className="font-medium">public</span> (
-                  {currentPublicAccess.toUpperCase()})
-                </>
-              ) : (
-                <>
-                  This list is <span className="font-medium">private</span>
-                </>
-              )}
-            </p>
-            {isAdmin &&
-              (currentPublicAccess ? (
-                <button
-                  onClick={handleMakePrivate}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border"
-                >
-                  Make Private
-                </button>
-              ) : (
-                <button
-                  onClick={handleMakePublic}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border"
-                >
-                  Make Public
-                </button>
-              ))}
-          </div>
-
-          <hr className="border-border mb-6" />
-
-          <div>
-            <h3 className="text-sm font-medium text-foreground mb-4">
-              Current Access
-            </h3>
-            <div className="space-y-3">
-              {isLoadingAccessList ? (
-                <p className="text-sm text-muted-foreground italic">
-                  Loading...
-                </p>
-              ) : members.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">
-                  No users have access yet
-                </p>
-              ) : (
-                sortedMembers.map((member) => {
-                  const displayName = displayNameFor(member);
-                  const avatarSrc = avatarUrls[member.id] || blankAvatarImg;
-
-                  return (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between py-2 px-3 bg-muted rounded-md"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={avatarSrc}
-                          alt="User avatar"
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-foreground">
-                            {displayName}
-                          </div>
-                          <div className="text-sm font-medium text-foreground">
-                            {member.access.toString().toUpperCase()}
-                          </div>
-                        </div>
-                      </div>
-                      {isAdmin && !member.isSelf && !member.isSyncServer && (
-                        <button
-                          onClick={() => handleRemoveUser(member.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                          aria-label="Remove user"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Modal isOpen={isOpen} onClose={onClose} title="Share this list">
+      <AccessEditor
+        target={target}
+        refreshToken={keyhiveVersion}
+        enabled={isOpen}
+        labelForMember={(member) =>
+          member.isSyncServer ? syncServer.DISPLAY_NAME : undefined
+        }
+        fallbackAvatarSrc={blankAvatarImg}
+      />
+    </Modal>
   );
 }

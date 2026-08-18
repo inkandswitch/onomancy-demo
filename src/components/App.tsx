@@ -1,25 +1,30 @@
 import keyhiveLogo from "../assets/honeybee.png";
 import halAvatarUrl from "../assets/HAL-9000.webp";
+import blankAvatarImg from "../assets/blankavatar.jpeg";
 import {
   isValidAutomergeUrl,
   type AutomergeUrl,
   useDocument,
+  useRepo,
 } from "@automerge/react/slim";
 import { TaskList } from "./TaskList";
 import { DocumentList } from "./DocumentList";
+import { GroupsPanel } from "./GroupsPanel";
 import { useHash } from "react-use";
-import { AvatarIcon } from "./AvatarIcon";
-import { UserModal } from "./UserModal";
-import { useState, useEffect } from "react";
-import { Phonebook, PHONEBOOK_URL } from "../phonebook";
-import { Identity } from "../active";
-import { useKeyhiveUpdates, useReRenderOnDocProgress } from "../hooks";
+import { useEffect, useState } from "react";
+import { Phonebook, PHONEBOOK_NOTICE, PHONEBOOK_URL } from "../phonebook";
 import {
-  AutomergeRepoKeyhive,
-  uint8ArrayToHex,
-  ContactCard,
-  verifyingKeyPeerIdWithoutSuffix,
-} from "@automerge/automerge-repo-keyhive";
+  AccountView,
+  Avatar,
+  DirectoryProvider,
+  Modal,
+  useAutomergeDocDirectory,
+  useDirectoryEntry,
+  useKeyhiveUpdates,
+  useReRenderOnDocProgress,
+  useSelfIdentity,
+} from "keyhive-react";
+import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
 import { log } from "../log";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -29,74 +34,53 @@ type AppProps = {
   automergeRepoKeyhive: AutomergeRepoKeyhive;
 };
 
+/** Builds the name directory everything renders peers through. */
 function App({ docUrl, automergeRepoKeyhive }: AppProps) {
-  const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
-
-  // The phonebook is a shared doc that syncs from the server (or is seeded
-  // locally on first run). Observe its load progress so
-  // names and avatars (including the sync server's) appear once it arrives,
-  // without a page reload.
-  useReRenderOnDocProgress(PHONEBOOK_URL);
-  const [identityState, setIdentityState] = useState<Identity>(() => ({
-    active: automergeRepoKeyhive.active,
-    contact: {
-      peerId: verifyingKeyPeerIdWithoutSuffix(automergeRepoKeyhive.peerId),
-      avatar: null,
-    },
-  }));
+  // The phonebook syncs from the server or is created locally on first run.
+  // Watching its progress makes names appear without a reload.
+  useReRenderOnDocProgress(useRepo(), PHONEBOOK_URL);
   const [phonebook, changePhonebook] = useDocument<Phonebook>(PHONEBOOK_URL);
 
-  // Load user's saved info from phonebook on startup
-  useEffect(() => {
-    if (phonebook && identityState.active.individual) {
-      const userHexId = uint8ArrayToHex(
-        identityState.active.individual.id.toBytes()
-      );
-      const savedContact = phonebook[userHexId];
-      if (savedContact) {
-        setIdentityState((prev) => ({
-          ...prev,
-          contact: {
-            peerId: prev.contact.peerId,
-            name: savedContact.name,
-            avatar: savedContact.avatar,
-          },
-        }));
-      }
-    }
-  }, [phonebook, identityState.active.individual]);
+  const directory = useAutomergeDocDirectory(phonebook, changePhonebook, {
+    source: "phonebook",
+    notice: PHONEBOOK_NOTICE,
+  });
 
-  // Give the sync server an avatar in the phonebook, so it is recognizable in
-  // the share dialog's member list. Derived from the configured server.
-  //
-  // Only the avatar is stored. The name comes from syncServer.DISPLAY_NAME at
-  // render time, because ARK already tells us which member is the sync server.
+  // Give the sync server an avatar so it is recognizable in the member list.
+  // Its name comes from syncServer.DISPLAY_NAME, since ARK already tells us
+  // which member it is.
   useEffect(() => {
-    if (!phonebook) return;
-    const serverContactCard = ContactCard.fromJson(
-      syncServer.CONTACT_CARD_JSON
-    );
-    if (!serverContactCard) return;
-    const serverHexId = uint8ArrayToHex(serverContactCard.individualId.bytes);
-    if (phonebook[serverHexId]) return;
+    if (!phonebook || !directory.publish) return;
+    const serverHexId = syncServer.identifierHex();
+    if (!serverHexId || phonebook[serverHexId]) return;
     fetch(halAvatarUrl)
       .then((res) => res.arrayBuffer())
       .then((buffer) => {
-        changePhonebook((doc) => {
-          doc[serverHexId] = {
-            peerId: syncServer.PEER_ID,
-            avatar: new Uint8Array(buffer),
-          };
+        void directory.publish?.({
+          id: serverHexId,
+          peerId: syncServer.PEER_ID,
+          avatar: new Uint8Array(buffer),
         });
       })
       .catch((error) => {
         log.error("Could not load the sync server avatar:", error);
       });
-  }, [phonebook, changePhonebook]);
+  }, [phonebook, directory]);
+
+  return (
+    <DirectoryProvider directory={directory}>
+      <AppShell docUrl={docUrl} automergeRepoKeyhive={automergeRepoKeyhive} />
+    </DirectoryProvider>
+  );
+}
+
+function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
+  const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
+  const self = useSelfIdentity(automergeRepoKeyhive);
+  const selfEntry = useDirectoryEntry(self.id);
 
   const [hash, setHash] = useHash();
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  // Remove the leading '#'
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const cleanHash = hash.slice(1);
   const selectedDocUrl =
     cleanHash && isValidAutomergeUrl(cleanHash)
@@ -105,47 +89,49 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-80 border-r border-border bg-card">
-        <DocumentList
-          docUrl={docUrl}
-          onSelectDocument={(url) => {
-            if (url) {
-              setHash(url);
-            } else {
-              setHash("");
-            }
-          }}
-          selectedDocument={selectedDocUrl}
+      <div className="w-80 border-r border-border bg-card flex flex-col">
+        <div className="flex-1 min-h-0">
+          <DocumentList
+            docUrl={docUrl}
+            onSelectDocument={(url) => setHash(url ?? "")}
+            selectedDocument={selectedDocUrl}
+            hive={automergeRepoKeyhive}
+          />
+        </div>
+        <GroupsPanel
           hive={automergeRepoKeyhive}
+          keyhiveVersion={keyhiveVersion}
         />
       </div>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col bg-muted">
-        {/* Header */}
         <header className="p-6 border-b border-foreground/10 bg-muted flex justify-center relative">
           <h1 className="text-2xl font-semibold flex items-center text-foreground">
             <img src={keyhiveLogo} alt="Keyhive logo" id="keyhive-logo" />
             Keyhive Demo
           </h1>
           <div className="absolute right-6 top-1/2 -translate-y-1/2">
-            <AvatarIcon
-              onClick={() => setIsUserModalOpen(true)}
-              identityState={identityState}
-            />
+            <button
+              onClick={() => setIsAccountModalOpen(true)}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary hover:bg-accent transition-colors duration-200 border-2 border-transparent hover:border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              aria-label="User profile"
+            >
+              <Avatar
+                avatar={selfEntry?.avatar}
+                name={selfEntry?.name}
+                sizeClassName="w-full h-full"
+                fallbackSrc={blankAvatarImg}
+              />
+            </button>
           </div>
         </header>
 
-        {/* Document */}
         <div className="flex-1 overflow-hidden">
           {selectedDocUrl ? (
             <ErrorBoundary key={selectedDocUrl}>
               <TaskList
                 docUrl={selectedDocUrl}
-                phonebook={phonebook}
                 hive={automergeRepoKeyhive}
-                identity={identityState}
                 keyhiveVersion={keyhiveVersion}
               />
             </ErrorBoundary>
@@ -156,14 +142,20 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
           )}
         </div>
       </div>
-      {isUserModalOpen && (
-        <UserModal
-          onClose={() => setIsUserModalOpen(false)}
-          identityState={identityState}
-          setIdentityState={setIdentityState}
-          changePhonebook={changePhonebook}
+
+      <Modal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        title="User Profile"
+      >
+        <AccountView
+          hive={automergeRepoKeyhive}
+          onSaved={() => setIsAccountModalOpen(false)}
+          onCancel={() => setIsAccountModalOpen(false)}
+          publishContactCard
+          fallbackAvatarSrc={blankAvatarImg}
         />
-      )}
+      </Modal>
     </div>
   );
 }

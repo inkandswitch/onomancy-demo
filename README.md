@@ -49,7 +49,7 @@ demo writes to, the demo requires you to supply your own via the
 and share it with the people you want in your phonebook.
 
 The document does not need to exist beforehand. The first peer to run with a
-given id seeds it, and later peers pick it up from the sync server.
+given id creates it and later peers pick it up from the sync server.
 
 Keep in mind that the id is the only thing protecting the phonebook. Anyone you
 give it to, and anyone they give it to, can edit its entries. This is fine for a
