@@ -11,16 +11,13 @@ export interface ContactBookProps {
   /** Show only these kinds. Entries with no recorded kind always show. */
   kinds?: readonly DirectoryEntryKind[];
   placeholder?: string;
-  /** Shown when the directory has nothing left to offer. */
-  emptyMessage?: string;
-  /** Entries to render before the reader has typed. Zero shows all of them. */
-  initialLimit?: number;
+  /** Shown before anything has been typed. */
+  prompt?: string;
   fallbackAvatarSrc?: string;
   className?: string;
 }
 
 function matches(entry: DirectoryEntry, query: string): boolean {
-  if (!query) return true;
   const needle = query.toLowerCase();
   return (
     (entry.name?.toLowerCase().includes(needle) ?? false) ||
@@ -40,8 +37,7 @@ export function ContactBook({
   excludeIds = [],
   kinds,
   placeholder = "Search by name",
-  emptyMessage = "Nobody to show yet.",
-  initialLimit = 8,
+  prompt = "Type a name to search.",
   fallbackAvatarSrc,
   className = "",
 }: ContactBookProps) {
@@ -51,6 +47,7 @@ export function ContactBook({
   const excluded = useMemo(() => new Set(excludeIds), [excludeIds]);
 
   const entries = useMemo(() => {
+    if (!query) return [];
     const wanted = kinds ? new Set(kinds) : null;
     return (
       directory
@@ -67,9 +64,6 @@ export function ContactBook({
         )
     );
   }, [directory, excluded, kinds, query]);
-
-  const shown =
-    query || initialLimit === 0 ? entries : entries.slice(0, initialLimit);
 
   if (!directory.enumerable) {
     return (
@@ -90,13 +84,13 @@ export function ContactBook({
         className="kh-w-full kh-px-3 kh-py-2 kh-border kh-border-border kh-rounded-md kh-shadow-sm focus:kh-outline-none focus:kh-ring-2 focus:kh-ring-ring focus:kh-border-ring kh-text-sm kh-bg-background kh-text-foreground"
       />
 
-      {shown.length === 0 ? (
+      {entries.length === 0 ? (
         <p className="kh-text-sm kh-text-muted-foreground">
-          {query ? "No matches." : emptyMessage}
+          {query ? "No matches." : prompt}
         </p>
       ) : (
         <ul className="kh-space-y-1 kh-max-h-64 kh-overflow-y-auto kh-list-none kh-p-0 kh-m-0">
-          {shown.map((entry) => (
+          {entries.map((entry) => (
             <li key={entry.id}>
               <button
                 type="button"
@@ -125,12 +119,6 @@ export function ContactBook({
             </li>
           ))}
         </ul>
-      )}
-
-      {!query && entries.length > shown.length && (
-        <p className="kh-text-xs kh-text-muted-foreground">
-          {entries.length - shown.length} more. Type to narrow the list.
-        </p>
       )}
     </div>
   );

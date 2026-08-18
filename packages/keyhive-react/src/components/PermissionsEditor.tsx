@@ -208,7 +208,7 @@ export function PermissionsEditor({
             onSelect={handlePick}
             excludeIds={memberIds}
             placeholder="Search contacts by name"
-            emptyMessage="No names yet. Contacts appear here once someone is named."
+            prompt="Type a name to find an individual or group."
             fallbackAvatarSrc={fallbackAvatarSrc}
           />
         </div>
