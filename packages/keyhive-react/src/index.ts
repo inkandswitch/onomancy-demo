@@ -55,8 +55,8 @@ export type { ContactBookProps } from "./components/ContactBook";
 export type { ProfileEditorProps } from "./components/ProfileEditor";
 export { DirectoryProvider } from "./components/DirectoryProvider";
 export type { DirectoryProviderProps } from "./components/DirectoryProvider";
-export { AccessEditor as AccessEditor } from "./components/AccessEditor";
-export type { AccessEditorProps as AccessEditorProps } from "./components/AccessEditor";
+export { AccessEditor } from "./components/AccessEditor";
+export type { AccessEditorProps } from "./components/AccessEditor";
 
 export { AccessBadge } from "./components/primitives/AccessBadge";
 export type { AccessBadgeProps } from "./components/primitives/AccessBadge";

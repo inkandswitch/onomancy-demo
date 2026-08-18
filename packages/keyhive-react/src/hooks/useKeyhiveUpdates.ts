@@ -15,10 +15,10 @@ export function useKeyhiveUpdates(hive: AutomergeRepoKeyhive): number {
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    let timeoutId: number;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const handler = () => {
       clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
+      timeoutId = setTimeout(() => {
         setVersion((v) => v + 1);
       }, KEYHIVE_UPDATE_DEBOUNCE_MS);
     };

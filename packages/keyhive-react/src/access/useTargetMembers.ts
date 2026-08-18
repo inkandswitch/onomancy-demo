@@ -18,8 +18,8 @@ export interface TargetMembersState {
 /** The members of a target, re-read whenever `refreshToken` changes. */
 export function useTargetMembers(
   target: AccessTarget,
-  refreshToken: number = 0,
-  enabled: boolean = true
+  refreshToken = 0,
+  enabled = true
 ): TargetMembersState {
   const [members, setMembers] = useState<TargetMember[]>([]);
   const [selfAccess, setSelfAccess] = useState<Access | undefined>(undefined);
