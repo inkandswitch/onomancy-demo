@@ -22,8 +22,8 @@ pnpm --filter component-test-app dev
 It opens at http://localhost:5558 and builds the library first. There is no
 configuration and no phonebook id to supply.
 
-## Trying the permission components
+## Trying the access components
 
-Granting access needs a second identity, and a second browser profile provides one.
-Open the app there, copy its contact card from the account section, and paste
-it into the "Contact Card" field here.
+Granting access needs a second identity which you can test using a second browser
+profile. Open the app there, copy its contact card from the account section, and
+paste it into the "Contact Card" field here.

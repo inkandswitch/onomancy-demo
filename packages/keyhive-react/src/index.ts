@@ -31,15 +31,15 @@ export {
   createGroupTarget,
   grantableLevels,
   publicIdHex,
-} from "./permissions/targets";
+} from "./access/targets";
 export type {
   AgentKind,
   GroupTargetOptions,
-  PermissionTarget,
+  AccessTarget,
   TargetMember,
-} from "./permissions/targets";
-export { useTargetMembers } from "./permissions/useTargetMembers";
-export type { TargetMembersState } from "./permissions/useTargetMembers";
+} from "./access/targets";
+export { useTargetMembers } from "./access/useTargetMembers";
+export type { TargetMembersState } from "./access/useTargetMembers";
 
 export { useAvatarUrl } from "./hooks/useAvatarUrl";
 export { useKeyhiveUpdates } from "./hooks/useKeyhiveUpdates";
@@ -55,8 +55,8 @@ export type { ContactBookProps } from "./components/ContactBook";
 export type { ProfileEditorProps } from "./components/ProfileEditor";
 export { DirectoryProvider } from "./components/DirectoryProvider";
 export type { DirectoryProviderProps } from "./components/DirectoryProvider";
-export { PermissionsEditor } from "./components/PermissionsEditor";
-export type { PermissionsEditorProps } from "./components/PermissionsEditor";
+export { AccessEditor as AccessEditor } from "./components/AccessEditor";
+export type { AccessEditorProps as AccessEditorProps } from "./components/AccessEditor";
 
 export { AccessBadge } from "./components/primitives/AccessBadge";
 export type { AccessBadgeProps } from "./components/primitives/AccessBadge";

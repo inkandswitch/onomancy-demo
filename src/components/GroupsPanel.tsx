@@ -8,7 +8,7 @@ import {
   bytesToHex,
   createGroupTarget,
   Modal,
-  PermissionsEditor,
+  AccessEditor,
   ProfileEditor,
   shortId,
   useDirectoryEntry,
@@ -140,7 +140,7 @@ function GroupModal({
         namePlaceholder="Name this group"
         saveLabel="Save group"
       />
-      <PermissionsEditor
+      <AccessEditor
         target={target}
         refreshToken={keyhiveVersion}
         labelForMember={(member) =>

@@ -5,7 +5,7 @@ React components for applications that use keyhive.
 | Component | For |
 | --- | --- |
 | `AccountView` | Display name, avatar, and the local contact card |
-| `PermissionsEditor` | Adding and removing members on a document or a group |
+| `AccessEditor` | Adding and removing members on a document or a group |
 | `DirectoryProvider` | Putting a name directory in scope |
 
 Plus `useKeyhiveUpdates`, `useReRenderOnDocProgress`, `useSelfIdentity` and
@@ -19,7 +19,7 @@ import {
   createDocumentTarget,
   createKeyhiveRuntime,
   DirectoryProvider,
-  PermissionsEditor,
+  AccessEditor,
   useKeyhiveUpdates,
 } from "keyhive-react";
 import "keyhive-react/styles.css";
@@ -34,7 +34,7 @@ function Share({ hive, docUrl, directory }) {
   );
   return (
     <DirectoryProvider directory={directory}>
-      <PermissionsEditor target={target} refreshToken={keyhiveVersion} />
+      <AccessEditor target={target} refreshToken={keyhiveVersion} />
     </DirectoryProvider>
   );
 }
@@ -44,9 +44,9 @@ Membership queries are async and keyhive has no per-document change
 notification, so components re-read when `refreshToken` changes. Subscribe once
 near the top of an app rather than per component.
 
-## Permission targets
+## Access targets
 
-A document and a group involve different APIs, so `PermissionTarget` allows
+A document and a group involve different APIs, so `AccessTarget` allows
 one editor to interact with either.
 
 ```tsx

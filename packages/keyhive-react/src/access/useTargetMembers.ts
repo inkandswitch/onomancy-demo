@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Access } from "@automerge/automerge-repo-keyhive";
-import type { PermissionTarget, TargetMember } from "./targets";
+import type { AccessTarget, TargetMember } from "./targets";
 
 export interface TargetMembersState {
   /** One entry per direct delegation. */
@@ -17,7 +17,7 @@ export interface TargetMembersState {
 
 /** The members of a target, re-read whenever `refreshToken` changes. */
 export function useTargetMembers(
-  target: PermissionTarget,
+  target: AccessTarget,
   refreshToken: number = 0,
   enabled: boolean = true
 ): TargetMembersState {

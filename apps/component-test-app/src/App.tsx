@@ -10,7 +10,7 @@ import {
   createDocumentTarget,
   createGroupTarget,
   DirectoryProvider,
-  PermissionsEditor,
+  AccessEditor,
   ProfileEditor,
   useKeyhiveUpdates,
 } from "keyhive-react";
@@ -144,10 +144,7 @@ function TestApp({ hive, repo }: AppProps) {
       <section>
         <h2>Document access</h2>
         {documentTarget ? (
-          <PermissionsEditor
-            target={documentTarget}
-            refreshToken={keyhiveVersion}
-          />
+          <AccessEditor target={documentTarget} refreshToken={keyhiveVersion} />
         ) : (
           <p className="hint">No document yet.</p>
         )}
@@ -165,10 +162,7 @@ function TestApp({ hive, repo }: AppProps) {
               namePlaceholder="Name this group"
               saveLabel="Save group"
             />
-            <PermissionsEditor
-              target={groupTarget}
-              refreshToken={keyhiveVersion}
-            />
+            <AccessEditor target={groupTarget} refreshToken={keyhiveVersion} />
             <button
               type="button"
               className="plain-button"

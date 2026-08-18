@@ -29,7 +29,7 @@ export interface TargetMember {
  * A keyhive document or group. ARK manages documents by `AutomergeUrl` but
  * does not currently manage groups, which go through `hive.keyhive` here.
  */
-export interface PermissionTarget {
+export interface AccessTarget {
   kind: "document" | "group";
   /** Stable string identifying the target for use as an effect dependency. */
   key: string;
@@ -98,7 +98,7 @@ function groupTransitiveMembers(
     : undefined;
 }
 
-/** Shared implementation of {@link PermissionTarget.addDirectoryEntry}. */
+/** Shared implementation of {@link AccessTarget.addDirectoryEntry}. */
 async function grantToDirectoryEntry(
   runtime: KeyhiveRuntime,
   hive: AutomergeRepoKeyhiveBase,
@@ -147,7 +147,7 @@ export function createDocumentTarget(
   runtime: KeyhiveRuntime,
   hive: AutomergeRepoKeyhiveBase,
   docUrl: AutomergeUrl
-): PermissionTarget {
+): AccessTarget {
   const capabilities = async (): Promise<Capability[]> => {
     if (runtime.isUnprotectedDoc(docUrl)) return [];
     const doc = await hive.keyhive.getDocument(
@@ -267,7 +267,7 @@ export function createGroupTarget(
   hive: AutomergeRepoKeyhiveBase,
   group: Group,
   options: GroupTargetOptions = {}
-): PermissionTarget {
+): AccessTarget {
   const selfHex = bytesToHex(hive.active.individual.id.toBytes());
   const publicHex = publicIdHex(runtime);
 

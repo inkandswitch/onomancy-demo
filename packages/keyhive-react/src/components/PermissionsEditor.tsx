@@ -3,17 +3,17 @@ import { shortId, useDirectory } from "../directory/context";
 import type { DirectoryEntry, NameDirectory } from "../directory/types";
 import {
   grantableLevels,
-  type PermissionTarget,
+  type AccessTarget,
   type TargetMember,
-} from "../permissions/targets";
-import { useTargetMembers } from "../permissions/useTargetMembers";
+} from "../access/targets";
+import { useTargetMembers } from "../access/useTargetMembers";
 import { ContactBook } from "./ContactBook";
 import { AccessBadge } from "./primitives/AccessBadge";
 import { Avatar } from "./primitives/Avatar";
 
-export interface PermissionsEditorProps {
+export interface AccessEditorProps {
   /** The document or group whose membership is being edited. */
-  target: PermissionTarget;
+  target: AccessTarget;
   /**
    * Counter that triggers a re-read of the member list. Pass the value from
    * `useKeyhiveUpdates`.
@@ -58,7 +58,7 @@ function memberLabel(
  * You can only delegate at levels at or below your own access levels. And only
  * an admin can revoke members, and only where a revocation here takes effect.
  */
-export function PermissionsEditor({
+export function AccessEditor({
   target,
   refreshToken = 0,
   enabled = true,
@@ -69,7 +69,7 @@ export function PermissionsEditor({
   publicAccessLevel = "edit",
   fallbackAvatarSrc,
   className = "",
-}: PermissionsEditorProps) {
+}: AccessEditorProps) {
   const directory = useDirectory();
   const runtime = target.runtime;
   const {
