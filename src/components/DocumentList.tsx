@@ -10,6 +10,7 @@ import { RootDocument } from "../rootDoc";
 import { useState, useEffect } from "react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import { useReRenderOnDocProgress } from "keyhive-react";
+import { ContextMenu, useContextMenu } from "./ContextMenu";
 import { errorMessage, log } from "../log";
 
 interface DocumentListProps {
@@ -31,6 +32,7 @@ export const DocumentList = ({
   });
   const [inputUrl, setInputUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   // Add the selected document to this identity's list if it is not already
   // there (e.g. when opening a shared document by URL). Keyed only on the
@@ -146,6 +148,14 @@ export const DocumentList = ({
                   : "text-foreground hover:bg-muted"
               }`}
               onClick={() => onSelectDocument(docUrl)}
+              onContextMenu={(e) =>
+                openMenu(e, [
+                  {
+                    label: "Remove from sidebar",
+                    onSelect: () => handleDeleteDocument(docUrl),
+                  },
+                ])
+              }
             >
               <div className="flex-grow min-w-0">
                 <DocumentTitle docUrl={docUrl} />
@@ -168,6 +178,8 @@ export const DocumentList = ({
           ))}
         </div>
       </div>
+
+      <ContextMenu state={menu} onClose={closeMenu} />
     </div>
   );
 };

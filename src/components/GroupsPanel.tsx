@@ -14,6 +14,7 @@ import {
   useDirectoryEntry,
 } from "keyhive-react";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
+import { ContextMenu, useContextMenu } from "./ContextMenu";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import * as syncServer from "../syncServer";
 import { errorMessage } from "../log";
@@ -30,6 +31,7 @@ export function GroupsPanel({ hive, keyhiveVersion }: GroupsPanelProps) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [openGroup, setOpenGroup] = useState<Group | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu();
 
   const createGroup = useCallback(async () => {
     setError(null);
@@ -41,6 +43,17 @@ export function GroupsPanel({ hive, keyhiveVersion }: GroupsPanelProps) {
       setError(`Could not create a group: ${errorMessage(err)}`);
     }
   }, [hive]);
+
+  // Only drops the group from this list. Nobody loses access.
+  const removeGroup = useCallback((toRemove: Group) => {
+    const id = bytesToHex(toRemove.id.toBytes());
+    setGroups((previous) =>
+      previous.filter((group) => bytesToHex(group.id.toBytes()) !== id)
+    );
+    setOpenGroup((open) =>
+      open && bytesToHex(open.id.toBytes()) === id ? null : open
+    );
+  }, []);
 
   return (
     <div className="p-4 border-t border-border">
@@ -71,6 +84,14 @@ export function GroupsPanel({ hive, keyhiveVersion }: GroupsPanelProps) {
               key={bytesToHex(group.id.toBytes())}
               group={group}
               onOpen={() => setOpenGroup(group)}
+              onContextMenu={(e) =>
+                openMenu(e, [
+                  {
+                    label: "Remove from sidebar",
+                    onSelect: () => removeGroup(group),
+                  },
+                ])
+              }
             />
           ))}
         </ul>
@@ -84,11 +105,21 @@ export function GroupsPanel({ hive, keyhiveVersion }: GroupsPanelProps) {
           onClose={() => setOpenGroup(null)}
         />
       )}
+
+      <ContextMenu state={menu} onClose={closeMenu} />
     </div>
   );
 }
 
-function GroupRow({ group, onOpen }: { group: Group; onOpen: () => void }) {
+function GroupRow({
+  group,
+  onOpen,
+  onContextMenu,
+}: {
+  group: Group;
+  onOpen: () => void;
+  onContextMenu: (event: React.MouseEvent) => void;
+}) {
   const id = bytesToHex(group.id.toBytes());
   const entry = useDirectoryEntry(id);
 
@@ -96,6 +127,7 @@ function GroupRow({ group, onOpen }: { group: Group; onOpen: () => void }) {
     <li>
       <button
         onClick={onOpen}
+        onContextMenu={onContextMenu}
         className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent transition-colors text-left cursor-pointer"
       >
         <Avatar
