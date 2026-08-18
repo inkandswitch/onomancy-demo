@@ -76,11 +76,11 @@ export function createLocalDirectory(): NameDirectory {
   }
 
   // Does not fire in the tab that made the change, so publish notifies too.
-  window.addEventListener("storage", (event) => {
+  function onStorage(event: StorageEvent) {
     if (event.key !== STORAGE_KEY) return;
     stored = read();
     notify();
-  });
+  }
 
   return {
     source: "localStorage",
@@ -117,9 +117,22 @@ export function createLocalDirectory(): NameDirectory {
       notify();
     },
 
+    // The window listener is attached only while someone is subscribed, so a
+    // directory that is built and dropped leaves nothing behind.
     subscribe(listener) {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      if (listeners.size === 1) {
+        window.addEventListener("storage", onStorage);
+        // Another tab may have written while nothing was listening.
+        stored = read();
+        notify();
+      }
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) {
+          window.removeEventListener("storage", onStorage);
+        }
+      };
     },
   };
 }
