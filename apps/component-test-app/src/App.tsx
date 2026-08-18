@@ -62,9 +62,7 @@ function TestApp({ hive, repo }: AppProps) {
   const createGroup = useCallback(async () => {
     setError(null);
     try {
-      // ARK does not currently expose group generation so this goes through
-      // the raw Keyhive.
-      setGroup(await hive.keyhive.generateGroup([]));
+      setGroup(await hive.generateGroup());
     } catch (err) {
       setError(
         `Could not create a group: ${err instanceof Error ? err.message : String(err)}`

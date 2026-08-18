@@ -34,8 +34,7 @@ export function GroupsPanel({ hive, keyhiveVersion }: GroupsPanelProps) {
   const createGroup = useCallback(async () => {
     setError(null);
     try {
-      // ARK does not expose group generation so this goes through keyhive.
-      const group = await hive.keyhive.generateGroup([]);
+      const group = await hive.generateGroup();
       setGroups((previous) => [...previous, group]);
       setOpenGroup(group);
     } catch (err) {
