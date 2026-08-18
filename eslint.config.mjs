@@ -81,8 +81,6 @@ export default [
     files: [
       "src/**/*.ts",
       "src/**/*.tsx",
-      "packages/*/src/**/*.ts",
-      "packages/*/src/**/*.tsx",
       "apps/*/src/**/*.ts",
       "apps/*/src/**/*.tsx",
     ],
@@ -112,7 +110,6 @@ export default [
         project: [
           "./tsconfig.json",
           "./tsconfig.node.json",
-          "./packages/keyhive-react/tsconfig.json",
           "./apps/component-test-app/tsconfig.json",
         ],
       },
@@ -141,7 +138,7 @@ export default [
     },
   },
   {
-    files: ["scripts/**/*.mjs", "packages/*/scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs"],
 
     plugins: {
       "automerge-slimport": {
