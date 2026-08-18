@@ -9,16 +9,12 @@ export function bytesToHex(bytes: Uint8Array): string {
 
 export function hexToBytes(hex: string): Uint8Array {
   const bare = hex.startsWith("0x") ? hex.slice(2) : hex;
-  if (bare.length % 2 !== 0) {
+  if (bare.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(bare)) {
     throw new Error(`Not a hex-encoded id: "${hex}"`);
   }
   const bytes = new Uint8Array(bare.length / 2);
   for (let i = 0; i < bytes.length; i++) {
-    const byte = Number.parseInt(bare.slice(i * 2, i * 2 + 2), 16);
-    if (Number.isNaN(byte)) {
-      throw new Error(`Not a hex-encoded id: "${hex}"`);
-    }
-    bytes[i] = byte;
+    bytes[i] = Number.parseInt(bare.slice(i * 2, i * 2 + 2), 16);
   }
   return bytes;
 }
