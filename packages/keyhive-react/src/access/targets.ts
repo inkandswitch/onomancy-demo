@@ -191,17 +191,13 @@ export function createDocumentTarget(
       // Individuals, whichever path their access came from (e.g., direct or group).
       const reachable = await hive.listMembers(docUrl);
       const flags = new Map(reachable.map((member) => [member.id, member]));
-
-      let caps: Capability[];
-      try {
-        caps = await capabilities();
-      } catch {
-        caps = [];
-      }
+      const caps = await capabilities();
       if (caps.length === 0) {
+        // No delegations to read, either because the document is unprotected
+        // or because it has not synced yet.
         return reachable.map((member) => ({
           ...member,
-          isDirect: true,
+          isDirect: false,
           kind: "individual" as const,
         }));
       }
