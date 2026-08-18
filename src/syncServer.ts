@@ -52,13 +52,15 @@ export const PEER_ID: PeerId = (
 ) as PeerId;
 
 // The server's hex-encoded keyhive id.
-let identifierHexCache: string | null | undefined;
+let identifierHexCache: string | undefined;
 export function identifierHex(): string | undefined {
   if (identifierHexCache === undefined) {
     const card = ContactCard.fromJson(CONTACT_CARD_JSON);
-    identifierHexCache = card ? uint8ArrayToHex(card.individualId.bytes) : null;
+    if (card) {
+      identifierHexCache = uint8ArrayToHex(card.individualId.bytes);
+    }
   }
-  return identifierHexCache ?? undefined;
+  return identifierHexCache;
 }
 
 // Shown wherever the sync server appears in the UI. ARK tags the sync server's

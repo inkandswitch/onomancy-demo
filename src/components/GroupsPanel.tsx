@@ -123,12 +123,10 @@ function GroupModal({
   keyhiveVersion: number;
   onClose: () => void;
 }) {
+  const syncServerId = syncServer.identifierHex();
   const target = useMemo(
-    () =>
-      createGroupTarget(keyhiveRuntime, hive, group, {
-        syncServerId: syncServer.identifierHex(),
-      }),
-    [hive, group]
+    () => createGroupTarget(keyhiveRuntime, hive, group, { syncServerId }),
+    [hive, group, syncServerId]
   );
 
   return (
