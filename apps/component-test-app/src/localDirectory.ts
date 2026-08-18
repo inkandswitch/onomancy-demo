@@ -2,7 +2,7 @@ import type {
   DirectoryEntry,
   DirectoryEntryKind,
   NameDirectory,
-} from "keyhive-react";
+} from "@automerge/keyhive-react";
 
 /**
  * A name directory kept in localStorage. Its contents live outside React so it

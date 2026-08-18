@@ -1,7 +1,7 @@
 import ReactDOM from "react-dom/client";
 import "./index.css";
 // Every class in it is prefixed kh-, so it sits alongside this app's Tailwind.
-import "keyhive-react/styles.css";
+import "@automerge/keyhive-react/styles.css";
 // The Repo's subduction subsystem uses the slim subduction entry, which does
 // not self-initialize its WASM. Importing the full entry initializes the
 // shared module instance.

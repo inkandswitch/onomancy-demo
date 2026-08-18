@@ -12,7 +12,7 @@ import {
   ProfileEditor,
   shortId,
   useDirectoryEntry,
-} from "keyhive-react";
+} from "@automerge/keyhive-react";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import { ContextMenu, useContextMenu } from "./ContextMenu";
 import { keyhiveRuntime } from "../keyhiveRuntime";
