@@ -81,8 +81,6 @@ export default [
     files: [
       "src/**/*.ts",
       "src/**/*.tsx",
-      "apps/*/src/**/*.ts",
-      "apps/*/src/**/*.tsx",
     ],
 
     plugins: {
@@ -110,7 +108,6 @@ export default [
         project: [
           "./tsconfig.json",
           "./tsconfig.node.json",
-          "./apps/component-test-app/tsconfig.json",
         ],
       },
     },
