@@ -26,8 +26,9 @@ import {
 } from "@automerge/keyhive-react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
-import { log } from "../log";
+import { errorMessage, log } from "../log";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { inviteFromHash, redeemInviteLink } from "../invite";
 
 type AppProps = {
   docUrl: AutomergeUrl;
@@ -75,6 +76,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
 }
 
 function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
+  const repo = useRepo();
   const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
   const self = useSelfIdentity(automergeRepoKeyhive);
   const selfEntry = useDirectoryEntry(self.id);
@@ -86,6 +88,40 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
     cleanHash && isValidAutomergeUrl(cleanHash)
       ? (cleanHash as AutomergeUrl)
       : null;
+
+  // An `#invite=` hash means this tab was opened from an invite link. Redeem it
+  // and then point the hash at the document, which is what adds it to the
+  // sidebar and opens it.
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  useEffect(() => {
+    const invite = inviteFromHash(hash);
+    if (!invite) return;
+
+    let cancelled = false;
+    setIsJoining(true);
+    setJoinError(null);
+    redeemInviteLink(
+      automergeRepoKeyhive,
+      repo,
+      invite,
+      automergeRepoKeyhive.active.contactCard
+    )
+      .then((joinedDocUrl) => {
+        if (!cancelled) setHash(joinedDocUrl);
+      })
+      .catch((error) => {
+        log.error("Could not join from the invite link:", error);
+        if (!cancelled) setJoinError(errorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) setIsJoining(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hash, automergeRepoKeyhive, repo, setHash]);
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -135,6 +171,17 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
                 keyhiveVersion={keyhiveVersion}
               />
             </ErrorBoundary>
+          ) : isJoining ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
+              Joining the shared list from your invite link...
+            </div>
+          ) : joinError ? (
+            <div
+              role="alert"
+              className="flex items-center justify-center h-full text-destructive bg-muted px-6 text-center"
+            >
+              Could not join from the invite link: {joinError}
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
               Select or create a document from the sidebar
