@@ -11,7 +11,7 @@ import { TaskList } from "./TaskList";
 import { DocumentList } from "./DocumentList";
 import { GroupsPanel } from "./GroupsPanel";
 import { useHash } from "react-use";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Phonebook, PHONEBOOK_NOTICE, PHONEBOOK_URL } from "../phonebook";
 import {
   AccountView,
@@ -26,13 +26,27 @@ import {
 } from "@automerge/keyhive-react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import * as syncServer from "../syncServer";
-import { log } from "../log";
+import { errorMessage, log } from "../log";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { inviteFromHash, redeemInviteLink } from "../invite";
 
 type AppProps = {
   docUrl: AutomergeUrl;
   automergeRepoKeyhive: AutomergeRepoKeyhive;
 };
+
+/**
+ * Point the location hash at `newHash` without adding a history entry.
+ *
+ * A redemption ends by replacing an `#invite=` fragment, and that fragment
+ * carries the invite identity's private key. Assigning `location.hash` would
+ * push, leaving the key in the session history, which would mean pressing back
+ * would cause a second redemption attempt.
+ */
+function replaceHash(newHash: string): void {
+  window.history.replaceState(null, "", `#${newHash}`);
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+}
 
 /** Builds the name directory everything renders peers through. */
 function App({ docUrl, automergeRepoKeyhive }: AppProps) {
@@ -75,6 +89,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
 }
 
 function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
+  const repo = useRepo();
   const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
   const self = useSelfIdentity(automergeRepoKeyhive);
   const selfEntry = useDirectoryEntry(self.id);
@@ -86,6 +101,61 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
     cleanHash && isValidAutomergeUrl(cleanHash)
       ? (cleanHash as AutomergeUrl)
       : null;
+
+  // An `#invite=` hash means this tab was opened from an invite link. Redeem it
+  // and then point the hash at the document, which is what adds it to the
+  // sidebar and opens it.
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinAttempt, setJoinAttempt] = useState<{
+    n: number;
+    of: number;
+  } | null>(null);
+  // The invite currently being redeemed. Cleared when that redemption settles.
+  const redeeming = useRef<string | null>(null);
+  useEffect(() => {
+    const invite = inviteFromHash(hash);
+    if (!invite) {
+      // A redemption may still be running, but nothing is waiting on it now.
+      setIsJoining(false);
+      setJoinError(null);
+      setJoinAttempt(null);
+      return;
+    }
+
+    if (redeeming.current === hash) return;
+    redeeming.current = hash;
+
+    let cancelled = false;
+    setIsJoining(true);
+    setJoinError(null);
+    redeemInviteLink(
+      automergeRepoKeyhive,
+      repo,
+      invite,
+      automergeRepoKeyhive.active.contactCard,
+      {
+        onAttempt: (n, of) => {
+          if (!cancelled) setJoinAttempt({ n, of });
+        },
+      }
+    )
+      .then((joinedDocUrl) => {
+        if (!cancelled) replaceHash(joinedDocUrl);
+      })
+      .catch((error) => {
+        log.error("Could not join from the invite link:", error);
+        if (!cancelled) setJoinError(errorMessage(error));
+      })
+      .finally(() => {
+        redeeming.current = null;
+        if (!cancelled) setIsJoining(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hash, automergeRepoKeyhive, repo]);
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -135,6 +205,20 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
                 keyhiveVersion={keyhiveVersion}
               />
             </ErrorBoundary>
+          ) : isJoining ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
+              Joining the shared list from your invite link...
+              {joinAttempt && joinAttempt.n > 1
+                ? ` (attempt ${joinAttempt.n} of ${joinAttempt.of})`
+                : ""}
+            </div>
+          ) : joinError ? (
+            <div
+              role="alert"
+              className="flex items-center justify-center h-full text-destructive bg-muted px-6 text-center"
+            >
+              Could not join from the invite link: {joinError}
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
               Select or create a document from the sidebar

@@ -78,10 +78,7 @@ export default [
     "plugin:@typescript-eslint/recommended"
   ),
   {
-    files: [
-      "src/**/*.ts",
-      "src/**/*.tsx",
-    ],
+    files: ["src/**/*.ts", "src/**/*.tsx"],
 
     plugins: {
       "@typescript-eslint": typescriptEslint,
@@ -105,10 +102,7 @@ export default [
       sourceType: "module",
 
       parserOptions: {
-        project: [
-          "./tsconfig.json",
-          "./tsconfig.node.json",
-        ],
+        project: ["./tsconfig.json", "./tsconfig.node.json"],
       },
     },
 

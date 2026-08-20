@@ -5,10 +5,12 @@ import "@automerge/keyhive-react/styles.css";
 // The Repo's subduction subsystem uses the slim subduction entry, which does
 // not self-initialize its WASM. Importing the full entry initializes the
 // shared module instance.
-import "@automerge/automerge-subduction";
+import { setSubductionLogLevel } from "@automerge/automerge-subduction";
 import {
   initializeAutomergeRepoKeyhive,
   AutomergeRepoKeyhive,
+  setKeyhiveLogLevel,
+  type KeyhiveLogLevel,
 } from "@automerge/automerge-repo-keyhive";
 // eslint-disable-next-line automerge-slimport/enforce-automerge-slim-import
 import { Repo } from "@automerge/automerge-repo";
@@ -23,6 +25,8 @@ declare global {
     hive: AutomergeRepoKeyhive;
     repo: Repo;
     setDemoLogLevel: (level: DemoLogLevel) => void;
+    setSubductionLogLevel: (level: string) => void;
+    setKeyhiveLogLevel: (level: KeyhiveLogLevel) => void;
   }
 }
 
@@ -49,6 +53,8 @@ async function start() {
   window.hive = hive;
   window.repo = repo;
   window.setDemoLogLevel = setDemoLogLevel;
+  window.setSubductionLogLevel = setSubductionLogLevel;
+  window.setKeyhiveLogLevel = setKeyhiveLogLevel;
 
   // Seed the shared phonebook if the sync server does not already have it (for
   // example a freshly started server). Fire-and-forget: the UI renders now and

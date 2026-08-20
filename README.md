@@ -12,6 +12,7 @@ demonstrates:
 - Creating and editing documents that sync through a subduction sync server.
 - Sharing a document with another identity at a chosen access level (relay,
   read, edit, admin) via its contact card.
+- Sharing a document by invite link, which anyone can open to add themselves.
 - Making a document public so anyone can read or edit it.
 - Revoking access, and access-gated UI (read-only view, hidden share button)
   driven by keyhive membership.
@@ -72,6 +73,30 @@ Three build-time variables override this:
 `SYNC_SERVER_CONTACT_CARD` and `SYNC_SERVER_PEER_ID` must be set together, and
 the identity they describe must match the server `SYNC_SERVER` points at. When
 they are unset the demo uses the built-in `keyhive` identity.
+
+## Invite links
+
+"Create invite link" in the share modal produces a URL that anyone can open to
+give themselves access to that list, at the access level selected next to it.
+
+In Keyhive, every membership change has to be signed by a principal that already
+holds at least the access being granted. An invite link carries one. Creating it
+generates a throwaway keyhive identity, delegates the document to that identity,
+and puts its key pair and prekey secrets in the URL fragment. Opening the link
+rebuilds that identity in the visitor's browser, briefly runs it as a second hive
+against the same sync server, and uses it to delegate the document to the visitor's
+own identity.
+
+The link is a bearer capability. Anyone who sees the URL has the access it
+carries, so treat it the way you would treat the document's contents.
+
+Once the join finishes, the fragment is replaced so the key material doesn't stay
+in the tab's history.
+
+The throwaway identity appears in the member list like any other member.
+Removing it there turns the link off. Keyhive re-roots the people who joined
+through it under whoever revokes it, so turning off a link does not remove the
+people who already used it.
 
 ## Build
 
