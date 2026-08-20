@@ -14,7 +14,8 @@ import {
   useDirectoryEntry,
 } from "@automerge/keyhive-react";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
-import { ContextMenu, useContextMenu } from "./ContextMenu";
+import { ContextMenu } from "./ContextMenu";
+import { useContextMenu } from "../useContextMenu";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import * as syncServer from "../syncServer";
 import { errorMessage } from "../log";

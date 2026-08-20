@@ -14,8 +14,9 @@
 // That grants nothing, so the redemption retries with a fresh session.
 //
 // The person who created a link can turn it off by revoking the invite identity
-// in the share modal, where it appears as an ordinary member. Keyhive re-roots
-// the people who joined through it, so revoking a link does not remove them.
+// in the share modal, where it appears as an ordinary member under the name
+// this module publishes for it. Keyhive re-roots the people who joined through
+// it, so revoking a link does not remove them.
 //
 // This is demo code. Anyone who sees the URL gets the access it carries.
 
@@ -43,6 +44,7 @@ import {
 // identity, so it needs the full entry the same way main.tsx does.
 // eslint-disable-next-line automerge-slimport/enforce-automerge-slim-import
 import { Repo } from "@automerge/automerge-repo";
+import { shortId } from "@automerge/keyhive-react";
 import * as syncServer from "./syncServer";
 import { log } from "./log";
 
@@ -246,6 +248,23 @@ class MemoryStorageAdapter implements StorageAdapterInterface {
   }
 }
 
+/** A link, plus who to revoke to turn it off. */
+export interface InviteLink {
+  /** The URL to share. */
+  url: string;
+  /** The invite identity's hex id, as the member list reports it. */
+  memberId: string;
+  /** The name published for that identity, so it can be named in the UI. */
+  name: string;
+}
+
+/**
+ * The name an invite identity goes by.
+ */
+export function inviteLinkName(memberId: string): string {
+  return `InviteLink: ${shortId(memberId)}`;
+}
+
 /**
  * Create a throwaway identity, give it `access` to the document, and return the
  * link that lets anyone act on its behalf.
@@ -257,7 +276,7 @@ export async function createInviteLink(
   hive: AutomergeRepoKeyhive,
   docUrl: AutomergeUrl,
   access: Access
-): Promise<string> {
+): Promise<InviteLink> {
   initKeyhiveWasm();
 
   const keyPair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, [
@@ -287,7 +306,9 @@ export async function createInviteLink(
 
   const url = new URL(window.location.href);
   url.hash = `${INVITE_HASH_PREFIX}${encodePayload(payload)}`;
-  return url.toString();
+
+  const memberId = uint8ArrayToHex(contactCard.id.toBytes());
+  return { url: url.toString(), memberId, name: inviteLinkName(memberId) };
 }
 
 /**

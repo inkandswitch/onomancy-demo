@@ -10,7 +10,8 @@ import { RootDocument } from "../rootDoc";
 import { useState, useEffect } from "react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import { useReRenderOnDocProgress } from "@automerge/keyhive-react";
-import { ContextMenu, useContextMenu } from "./ContextMenu";
+import { ContextMenu } from "./ContextMenu";
+import { useContextMenu } from "../useContextMenu";
 import { errorMessage, log } from "../log";
 
 interface DocumentListProps {

@@ -1,35 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-
-export interface ContextMenuItem {
-  label: string;
-  onSelect: () => void;
-}
-
-export interface ContextMenuState {
-  x: number;
-  y: number;
-  items: ContextMenuItem[];
-}
-
-/**
- * Track a right-click menu for a list of rows.
- *
- * Returns the state to pass to {@link ContextMenu}, an `open` for a row's
- * `onContextMenu`, and a `close`.
- */
-export function useContextMenu() {
-  const [menu, setMenu] = useState<ContextMenuState | null>(null);
-
-  const open = (event: React.MouseEvent, items: ContextMenuItem[]) => {
-    event.preventDefault();
-    // A right-click also selects the row underneath without this.
-    event.stopPropagation();
-    setMenu({ x: event.clientX, y: event.clientY, items });
-  };
-
-  return { menu, open, close: () => setMenu(null) };
-}
+import { type ContextMenuState } from "../useContextMenu";
 
 /**
  * A menu at a point on screen, dismissed by choosing something, clicking away,
