@@ -27,7 +27,11 @@ let inviteAvatar: Promise<Uint8Array> | null = null;
 function inviteAvatarBytes(): Promise<Uint8Array> {
   inviteAvatar ??= fetch(linkAvatarImg)
     .then((res) => res.arrayBuffer())
-    .then((buffer) => new Uint8Array(buffer));
+    .then((buffer) => new Uint8Array(buffer))
+    .catch((error: unknown) => {
+      inviteAvatar = null;
+      throw error;
+    });
   return inviteAvatar;
 }
 
@@ -58,12 +62,14 @@ export function ShareModal({
   const [invite, setInvite] = useState<InviteLink | null>(null);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // A link belongs to the document it was made for, so drop it when the modal
   // is reopened or pointed at a different list.
   useEffect(() => {
     setInvite(null);
     setInviteError(null);
+    setCopied(false);
   }, [docUrl, isOpen]);
 
   // Create a throwaway identity, give it the selected access level, and return
@@ -80,7 +86,7 @@ export function ShareModal({
         Access.fromString(level)
       );
       setInvite(link);
-      await copyToClipboard(link.url);
+      setCopied(await copyToClipboard(link.url));
       // Give it a name and a link icon in the phonebook to make it recognizable.
       try {
         await directory.publish?.({
@@ -147,15 +153,17 @@ export function ShareModal({
                       className="flex-1 px-3 py-2 border border-border rounded-md shadow-sm text-sm bg-muted text-foreground"
                     />
                     <button
-                      onClick={() => void copyToClipboard(invite.url)}
+                      onClick={() =>
+                        void copyToClipboard(invite.url).then(setCopied)
+                      }
                       className="px-4 py-2 bg-secondary text-secondary-foreground text-sm font-medium rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors border border-border"
                     >
                       Copy
                     </button>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Copied. Anyone with this link can join. To disable the link,
-                    remove{" "}
+                    {copied ? "Copied. " : "Copy the link above to share it. "}
+                    Anyone with this link can join. To disable the link, remove{" "}
                     <span className="font-medium text-foreground">
                       {invite.name}
                     </span>{" "}

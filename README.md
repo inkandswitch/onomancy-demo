@@ -90,6 +90,9 @@ own identity.
 The link is a bearer capability. Anyone who sees the URL has the access it
 carries, so treat it the way you would treat the document's contents.
 
+Once the join finishes, the fragment is replaced so the key material doesn't stay
+in the tab's history.
+
 The throwaway identity appears in the member list like any other member.
 Removing it there turns the link off. Keyhive re-roots the people who joined
 through it under whoever revokes it, so turning off a link does not remove the

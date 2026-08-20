@@ -11,7 +11,7 @@ import { TaskList } from "./TaskList";
 import { DocumentList } from "./DocumentList";
 import { GroupsPanel } from "./GroupsPanel";
 import { useHash } from "react-use";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Phonebook, PHONEBOOK_NOTICE, PHONEBOOK_URL } from "../phonebook";
 import {
   AccountView,
@@ -34,6 +34,19 @@ type AppProps = {
   docUrl: AutomergeUrl;
   automergeRepoKeyhive: AutomergeRepoKeyhive;
 };
+
+/**
+ * Point the location hash at `newHash` without adding a history entry.
+ *
+ * A redemption ends by replacing an `#invite=` fragment, and that fragment
+ * carries the invite identity's private key. Assigning `location.hash` would
+ * push, leaving the key in the session history, which would mean pressing back
+ * would cause a second redemption attempt.
+ */
+function replaceHash(newHash: string): void {
+  window.history.replaceState(null, "", `#${newHash}`);
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+}
 
 /** Builds the name directory everything renders peers through. */
 function App({ docUrl, automergeRepoKeyhive }: AppProps) {
@@ -94,9 +107,24 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
   // sidebar and opens it.
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
+  const [joinAttempt, setJoinAttempt] = useState<{
+    n: number;
+    of: number;
+  } | null>(null);
+  // The invite currently being redeemed. Cleared when that redemption settles.
+  const redeeming = useRef<string | null>(null);
   useEffect(() => {
     const invite = inviteFromHash(hash);
-    if (!invite) return;
+    if (!invite) {
+      // A redemption may still be running, but nothing is waiting on it now.
+      setIsJoining(false);
+      setJoinError(null);
+      setJoinAttempt(null);
+      return;
+    }
+
+    if (redeeming.current === hash) return;
+    redeeming.current = hash;
 
     let cancelled = false;
     setIsJoining(true);
@@ -105,23 +133,29 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
       automergeRepoKeyhive,
       repo,
       invite,
-      automergeRepoKeyhive.active.contactCard
+      automergeRepoKeyhive.active.contactCard,
+      {
+        onAttempt: (n, of) => {
+          if (!cancelled) setJoinAttempt({ n, of });
+        },
+      }
     )
       .then((joinedDocUrl) => {
-        if (!cancelled) setHash(joinedDocUrl);
+        if (!cancelled) replaceHash(joinedDocUrl);
       })
       .catch((error) => {
         log.error("Could not join from the invite link:", error);
         if (!cancelled) setJoinError(errorMessage(error));
       })
       .finally(() => {
+        redeeming.current = null;
         if (!cancelled) setIsJoining(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [hash, automergeRepoKeyhive, repo, setHash]);
+  }, [hash, automergeRepoKeyhive, repo]);
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -174,6 +208,9 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
           ) : isJoining ? (
             <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
               Joining the shared list from your invite link...
+              {joinAttempt && joinAttempt.n > 1
+                ? ` (attempt ${joinAttempt.n} of ${joinAttempt.of})`
+                : ""}
             </div>
           ) : joinError ? (
             <div

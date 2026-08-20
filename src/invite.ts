@@ -49,10 +49,16 @@ import * as syncServer from "./syncServer";
 import { log } from "./log";
 
 /** The `#invite=` fragment prefix an invite link uses. */
-export const INVITE_HASH_PREFIX = "invite=";
+const INVITE_HASH_PREFIX = "invite=";
 
 /** How long to wait for the document's keyhive state to reach the invite identity. */
 const DOC_SYNC_TIMEOUT_MS = 30_000;
+
+/**
+ * The budget the first attempt gets for the waits that happen before anything
+ * is signed.
+ */
+const FIRST_ATTEMPT_SYNC_TIMEOUT_MS = 10_000;
 
 /** How long to wait for the new delegation to come back to us before giving up on confirmation. */
 const JOIN_CONFIRM_TIMEOUT_MS = 30_000;
@@ -69,7 +75,7 @@ const REDEEM_RETRY_DELAY_MS = 3_000;
  * What a link carries. Versioned so a link created by an older build can be
  * rejected with a clear message.
  */
-interface InvitePayload {
+export interface InvitePayload {
   v: 1;
   /** The document being shared. */
   doc: AutomergeUrl;
@@ -104,7 +110,7 @@ function encodePayload(payload: InvitePayload): string {
 }
 
 /** Parse an invite payload, returning null if it is not one we understand. */
-export function decodeInvite(encoded: string): InvitePayload | null {
+function decodeInvite(encoded: string): InvitePayload | null {
   try {
     const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
     const json = new TextDecoder().decode(base64ToBytes(base64));
@@ -152,14 +158,14 @@ async function importKeyPair(
       key.publicKey,
       "Ed25519",
       true,
-      key.publicKey.key_ops as KeyUsage[]
+      ["verify"]
     ),
     privateKey: await crypto.subtle.importKey(
       "jwk",
       key.privateKey,
       "Ed25519",
       true,
-      key.privateKey.key_ops as KeyUsage[]
+      ["sign"]
     ),
   };
 }
@@ -184,6 +190,11 @@ async function poll<T>(
  *
  * The progress query has to be created once and then polled. Asking the repo
  * for a fresh query each time restarts it, so it never leaves "loading".
+ *
+ * The query's own `whenReady()` is deliberately not used. It rejects the moment
+ * the query reports "unavailable", and that state is not terminal here. A
+ * "failed" query is terminal, so that one is reported at once instead of
+ * waiting out the timeout.
  */
 async function waitUntilReadable(
   repo: Repo,
@@ -193,7 +204,13 @@ async function waitUntilReadable(
 ): Promise<void> {
   const query = repo.findWithProgress(docUrl);
   await poll(
-    async () => (query.peek().state === "ready" ? true : null),
+    async () => {
+      const state = query.peek();
+      if (state.state === "failed") {
+        throw new Error(message, { cause: state.error });
+      }
+      return state.state === "ready" ? true : null;
+    },
     timeoutMs,
     message
   );
@@ -261,7 +278,7 @@ export interface InviteLink {
 /**
  * The name an invite identity goes by.
  */
-export function inviteLinkName(memberId: string): string {
+function inviteLinkName(memberId: string): string {
   return `InviteLink: ${shortId(memberId)}`;
 }
 
@@ -317,6 +334,14 @@ export async function createInviteLink(
  */
 class BeforeDelegationError extends Error {}
 
+export interface RedeemOptions {
+  /**
+   * Called as each attempt begins, with the attempt number and how many there
+   * will be.
+   */
+  onAttempt?: (attempt: number, of: number) => void;
+}
+
 /**
  * Act as the invite identity long enough to grant `myContactCard` the same
  * access, then drop it. Resolves with the document URL once this identity can
@@ -329,35 +354,44 @@ export async function redeemInviteLink(
   hive: AutomergeRepoKeyhive,
   repo: Repo,
   payload: InvitePayload,
-  myContactCard: ContactCard
+  myContactCard: ContactCard,
+  options: RedeemOptions = {}
 ): Promise<AutomergeUrl> {
-  for (let attempt = 1; ; attempt++) {
+  for (let attempt = 1; attempt <= REDEEM_ATTEMPTS; attempt++) {
+    options.onAttempt?.(attempt, REDEEM_ATTEMPTS);
     try {
-      return await attemptRedeem(hive, repo, payload, myContactCard);
+      return await attemptRedeem(hive, repo, payload, myContactCard, attempt);
     } catch (error) {
-      const retryable = error instanceof BeforeDelegationError;
-      if (!retryable || attempt >= REDEEM_ATTEMPTS) {
-        throw retryable ? new Error((error as Error).message) : error;
+      if (!(error instanceof BeforeDelegationError)) throw error;
+      if (attempt >= REDEEM_ATTEMPTS) {
+        // Callers have no use for BeforeDelegationError once we have stopped
+        // retrying, but the original is worth keeping as the cause.
+        throw new Error(error.message, { cause: error });
       }
       log.warn(
-        `Invite attempt ${attempt} delegated nothing (${(error as Error).message}). Trying again with a fresh invite identity session.`
+        `Invite attempt ${attempt} delegated nothing (${error.message}). Trying again with a fresh invite identity session.`
       );
       await new Promise((resolve) =>
         setTimeout(resolve, REDEEM_RETRY_DELAY_MS)
       );
     }
   }
+  // Unreachable: the last attempt either returns or throws above.
+  throw new Error("The invite link could not be redeemed.");
 }
 
 async function attemptRedeem(
   hive: AutomergeRepoKeyhive,
   repo: Repo,
   payload: InvitePayload,
-  myContactCard: ContactCard
+  myContactCard: ContactCard,
+  attempt: number
 ): Promise<AutomergeUrl> {
   const access = Access.fromString(payload.access);
   const docUrl = payload.doc;
   const storage = new MemoryStorageAdapter();
+  const syncTimeoutMs =
+    attempt === 1 ? FIRST_ATTEMPT_SYNC_TIMEOUT_MS : DOC_SYNC_TIMEOUT_MS;
 
   // A second hive, running as the invite identity, with its own repo and its
   // own connection to the sync server. It needs one because the delegation it
@@ -390,7 +424,7 @@ async function attemptRedeem(
     try {
       await poll(
         () => inviteHive.keyhive.getDocument(docId),
-        DOC_SYNC_TIMEOUT_MS,
+        syncTimeoutMs,
         "The invited document did not sync. The link may have been revoked."
       );
 
@@ -402,7 +436,7 @@ async function attemptRedeem(
       await waitUntilReadable(
         inviteRepo,
         docUrl,
-        DOC_SYNC_TIMEOUT_MS,
+        syncTimeoutMs,
         "The invited document synced but could not be read. The link may be stale."
       );
     } catch (error) {
