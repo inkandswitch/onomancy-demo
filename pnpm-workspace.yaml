@@ -6,10 +6,13 @@ catalog:
   "@automerge/automerge-subduction": 0.16.1
   "@automerge/keyhive-react": 0.1.0-alpha.3
   "@automerge/react": 2.6.0-subduction.48
+  "@inkandswitch/onomancy": 0.1.0
   "@keyhive/keyhive": 0.1.0-alpha.8
 
 # Transitive copies of the WASM-backed packages, pulled in by
-# automerge-repo-keyhive.
+# automerge-repo-keyhive. Onomancy is deliberately absent here: it is a
+# distinct Wasm module rather than a second copy of one of these, so there is
+# no duplicate to collapse onto a single instance.
 overrides:
   "@automerge/automerge-repo": "catalog:"
   "@automerge/automerge-subduction": "catalog:"

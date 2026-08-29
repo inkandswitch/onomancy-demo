@@ -167,6 +167,16 @@ export default defineConfig(({ mode }) => {
         "@automerge/automerge-subduction",
         "@automerge/automerge-subduction/slim",
         "@automerge/automerge-repo-keyhive",
+        // Onomancy needs excluding for a different reason than the packages
+        // above. It is not duplicated anywhere, so nothing has to be collapsed
+        // onto one instance and it needs no alias: every entry variant
+        // re-exports the same web-target bindings, so the parallel class table
+        // trap the subduction alias avoids cannot arise here. The browser
+        // condition picks dist/esm/bundler.js, which loads the wasm through
+        // `new URL("../onomancy.wasm", import.meta.url)`. Pre-bundling would
+        // rewrite that module to a different directory and the relative URL
+        // would go with it, so the wasm would 404.
+        "@inkandswitch/onomancy",
         "@keyhive/keyhive",
         "@keyhive/keyhive/slim",
       ],

@@ -23,6 +23,7 @@
     "@automerge/automerge-subduction": "catalog:",
     "@automerge/keyhive-react": "catalog:",
     "@automerge/react": "catalog:",
+    "@inkandswitch/onomancy": "catalog:",
     "@keyhive/keyhive": "catalog:",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
