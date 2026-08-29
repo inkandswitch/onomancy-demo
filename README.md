@@ -40,6 +40,24 @@ To override the id for a single run without touching `.env`:
 PHONEBOOK_DOC_ID=automerge:... pnpm dev
 ```
 
+### With Nix
+
+`nix develop` drops you into a shell with node, pnpm and the language servers,
+and prints a menu of the commands below.
+
+| Command | Purpose |
+| --- | --- |
+| `dev` | Seed `.env` if it has no id yet, then start the dev server. |
+| `dev:local` | The same, against a local sync server instead of the public one. |
+| `env:init` | Write a fresh `PHONEBOOK_DOC_ID` to `.env`, leaving an existing one alone. |
+| `lint` / `lint:fix` | ESLint and Prettier. |
+| `sync-server` | Run a local `subduction_cli` on `:3030`. Built on first use. |
+| `ci` | Lint, typecheck and build, the way CI runs them. |
+
+Each is also a flake app, so `nix run .#ci` and `nix run .#sync-server` work
+without entering the shell. `sync-server` builds the subduction Rust workspace
+the first time you run it, which is why it is not part of the dev shell.
+
 ## Phonebook configuration
 
 The phonebook is a shared document holding every peer's display name and avatar.
