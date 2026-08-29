@@ -16,6 +16,22 @@ catalog:
 overrides:
   "@automerge/automerge-repo": "catalog:"
   "@automerge/automerge-subduction": "catalog:"
+  # TEMPORARY, and it breaks reproducibility. The onomancy exports Phase 2
+  # needs (useOnomancyDirectory, DnsNameBadge, AccountView showDnsName) are not
+  # in the published 0.1.0-alpha.3, so this points at a local pre-release
+  # tarball built from the keyhive-react `onomancy` branch.
+  #
+  # A tarball rather than a `link:` because the two repositories are in
+  # separate sandbox mount namespaces and cannot see each other's working
+  # trees. It is the better artifact regardless: fixed contents, verifiable by
+  # checksum, rather than a live view of another tree.
+  #
+  #   sha256 ae7c6c1e3ecba58ff4384e9ca4fb292ead1c4b63878bb97d9d750faf0e5f92db
+  #
+  # REVERT to `catalog:` once alpha.4 (or later) is published. Until then
+  # `pnpm install --frozen-lockfile` cannot work on a machine without this
+  # file, so .github/workflows/deploy.yml and the flake's `ci` are both broken.
+  "@automerge/keyhive-react": "file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz"
 
 onlyBuiltDependencies:
   - esbuild

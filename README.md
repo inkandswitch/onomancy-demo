@@ -183,6 +183,85 @@ either.
 DNS proves `hostname -> document`. Keyhive proves `document -> people`. Neither
 layer is asked to do the other's job.
 
+## Verified names
+
+An identity can claim a DNS name in the account modal, and it shows up beside
+them in the share modal and the contact search. A claim is only a claim until
+it is checked, so it carries a status:
+
+| Badge         | Means                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `verified`    | A DNSSEC-validated `_onomancy` record for that domain designates this identity.                  |
+| `mismatch`    | The domain's record designates somebody else. The claim is false.                                |
+| `unreachable` | The domain published nothing usable, or could not be reached.                                    |
+| `unsynced`    | The domain designates a document this device has not synced, so the claim cannot be checked yet. |
+| `pending`     | The check is still running.                                                                      |
+| `invalid`     | Not a DNS name at all.                                                                           |
+
+### What a verified badge proves, exactly
+
+That the domain, as attested by a DNSSEC chain from the IANA root key, during
+the window that chain's signatures were valid, designated this identity.
+
+That is all. In particular it does **not** prove:
+
+- That the person behind the identity is who you think. It proves control of a
+  domain, not identity.
+- Anything about the domain owner's intentions, or that they meant to vouch for
+  anything this identity does.
+- Anything about any other name, including similar-looking ones. Verification is
+  per-name.
+- That the binding is current. DNSSEC signatures have validity windows, and a
+  chain is graded for freshness rather than treated as timeless.
+
+### The two verdicts that are not evidence
+
+`unreachable` and `unsynced` are not weak versions of `mismatch`. They are the
+absence of an answer, and the demo keeps them visually distinct from it for
+that reason. A domain that is down, or a namestore that has not arrived, tells
+you nothing about whether the claim is true — treating either as suspicion
+would punish people for network conditions.
+
+`mismatch` is different. It means a record was fetched, validated, and
+designates someone else. That is a real answer, and a negative one.
+
+### A claim is forgeable; a badge is not
+
+Claims live in the phonebook, which is unencrypted and writable by anyone
+holding its id, so anyone can write any claim into anyone's entry. This is
+safe, and it is the architecture working rather than a gap in it: the badge is
+not read from the phonebook. It comes from resolving the domain and checking
+what that domain designates. A forged claim renders `mismatch` or
+`unreachable`. Nobody can write their way to `verified`.
+
+The document carries the assertion. DNS carries the authority.
+
+### The errors run one way
+
+The guarantee above is one-directional, and it is worth being explicit about
+which direction. Verification does not produce false positives: a badge cannot
+be forged, because it is not read from any document an attacker can write.
+
+It does produce **false negatives** — legitimate holders of a name reading as
+unverified. Never wrongly verifying, while sometimes wrongly failing to verify,
+is the right trade for a naming system. Saying so is more useful than implying
+the checks are exact.
+
+The known case: designation consults the bound document's own delegations, and
+those do not change when a group that already has access gains a member. So an
+identity holding admin on a namestore _through a group_ rather than directly
+reads `unsynced` — the copy for "cannot check yet" — about a document that is
+plainly present. This demo supports nested groups, so the case is reachable
+here.
+
+The verdict is honest; the wording is not. Fixing the wording is possible
+today. Fixing the _verdict_ is not: the only available evidence about indirect
+access is the set of individuals holding decryption keys for the document,
+which carries no access level at all. That could support an honest "holds keys
+to this document, by some route, at an unknown level" — never a checkmark.
+Verifying a nested-group admin needs transitive delegations _with_
+capabilities, which no current API exposes.
+
 ## Build
 
 ```

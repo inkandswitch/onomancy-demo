@@ -11,19 +11,23 @@ import { TaskList } from "./TaskList";
 import { DocumentList } from "./DocumentList";
 import { GroupsPanel } from "./GroupsPanel";
 import { useHash } from "react-use";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Phonebook, PHONEBOOK_NOTICE, PHONEBOOK_URL } from "../phonebook";
 import {
   AccountView,
   Avatar,
   DirectoryProvider,
   Modal,
+  createKeyhiveDesignation,
   useAutomergeDocDirectory,
   useDirectoryEntry,
   useKeyhiveUpdates,
+  useOnomancyDirectory,
   useReRenderOnDocProgress,
   useSelfIdentity,
 } from "@automerge/keyhive-react";
+import { keyhiveRuntime } from "../keyhiveRuntime";
+import { onomancyRuntime } from "../onomancyRuntime";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
 import { useNamestore } from "../namestore";
 import * as syncServer from "../syncServer";
@@ -60,9 +64,28 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
   useReRenderOnDocProgress(useRepo(), PHONEBOOK_URL);
   const [phonebook, changePhonebook] = useDocument<Phonebook>(PHONEBOOK_URL);
 
-  const directory = useAutomergeDocDirectory(phonebook, changePhonebook, {
+  const baseDirectory = useAutomergeDocDirectory(phonebook, changePhonebook, {
     source: "phonebook",
     notice: PHONEBOOK_NOTICE,
+  });
+
+  // A domain binds a namestore document, and that document's admins are the
+  // ones it speaks for. The keyhive designation checks exactly that, and also
+  // accepts the solo case where a domain binds an identity's own key, so both
+  // anchor shapes verify.
+  //
+  // Memoized because useOnomancyDirectory keys its verdict cache on the base
+  // directory identity: a fresh designation on every render would not rebuild
+  // the wrapper, but a fresh base would throw the cache away.
+  const designation = useMemo(
+    () => createKeyhiveDesignation(keyhiveRuntime, automergeRepoKeyhive),
+    [automergeRepoKeyhive]
+  );
+
+  // Decorates entries claiming a dnsName with a verification status. Claims
+  // without the wrapper render as claims: no stronger than a display name.
+  const directory = useOnomancyDirectory(baseDirectory, onomancyRuntime, {
+    designation,
   });
 
   // Give the sync server an avatar so it is recognizable in the member list.
@@ -273,10 +296,20 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
         onClose={() => setIsAccountModalOpen(false)}
         title="User Profile"
       >
+        {/*
+          showDnsName is explicit rather than left to its default because the
+          phonebook is unencrypted and writable by anyone holding its id, so a
+          claim stored in it is forgeable. That is survivable, and is the point
+          of verifying: a forged claim reads `mismatch` or `unreachable`, never
+          `verified`, because the badge comes from a DNSSEC chain rather than
+          from the document. An attacker can write any claim they like and
+          still cannot produce a verified one.
+        */}
         <AccountView
           hive={automergeRepoKeyhive}
           onSaved={() => setIsAccountModalOpen(false)}
           onCancel={() => setIsAccountModalOpen(false)}
+          showDnsName
           publishContactCard
           fallbackAvatarSrc={blankAvatarImg}
         />
