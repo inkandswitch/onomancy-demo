@@ -25,9 +25,14 @@ import {
   useSelfIdentity,
 } from "@automerge/keyhive-react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
+import { useNamestore } from "../namestore";
 import * as syncServer from "../syncServer";
 import { errorMessage, log } from "../log";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { NameBox } from "./NameBox";
+import { NamestorePanel } from "./NamestorePanel";
+import { describePartial } from "../names";
+import { useNameRoute } from "../useNameRoute";
 import { inviteFromHash, redeemInviteLink } from "../invite";
 
 type AppProps = {
@@ -90,6 +95,7 @@ function App({ docUrl, automergeRepoKeyhive }: AppProps) {
 
 function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
   const repo = useRepo();
+  const namestore = useNamestore(repo, automergeRepoKeyhive);
   const keyhiveVersion = useKeyhiveUpdates(automergeRepoKeyhive);
   const self = useSelfIdentity(automergeRepoKeyhive);
   const selfEntry = useDirectoryEntry(self.id);
@@ -97,10 +103,17 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
   const [hash, setHash] = useHash();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const cleanHash = hash.slice(1);
-  const selectedDocUrl =
+  const directDocUrl =
     cleanHash && isValidAutomergeUrl(cleanHash)
       ? (cleanHash as AutomergeUrl)
       : null;
+
+  // A hash that is neither a document id nor an invite may be a name. The
+  // resolved document opens exactly as a pasted id would, so a name is a
+  // shareable URL rather than a second way of navigating.
+  const nameRoute = useNameRoute(repo, hash, namestore.url);
+  const selectedDocUrl =
+    directDocUrl ?? (nameRoute.status === "resolved" ? nameRoute.url : null);
 
   // An `#invite=` hash means this tab was opened from an invite link. Redeem it
   // and then point the hash at the document, which is what adds it to the
@@ -166,7 +179,14 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
             onSelectDocument={(url) => setHash(url ?? "")}
             selectedDocument={selectedDocUrl}
             hive={automergeRepoKeyhive}
+            namestoreUrl={namestore.url}
           />
+        </div>
+        <div className="p-4 border-t border-border">
+          <h2 className="text-sm font-medium text-foreground mb-3">
+            Open by name
+          </h2>
+          <NameBox onResolve={(name) => setHash(name)} />
         </div>
         <GroupsPanel
           hive={automergeRepoKeyhive}
@@ -205,6 +225,27 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
                 keyhiveVersion={keyhiveVersion}
               />
             </ErrorBoundary>
+          ) : nameRoute.status === "resolving" ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
+              Resolving {nameRoute.name.value}...
+            </div>
+          ) : nameRoute.status === "partial" ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted px-6 text-center gap-2">
+              <p className="font-mono text-foreground">
+                {nameRoute.name.value}
+              </p>
+              <p className="max-w-prose">
+                {describePartial(nameRoute.resolution)}
+              </p>
+            </div>
+          ) : nameRoute.status === "error" ? (
+            <div
+              role="alert"
+              className="flex flex-col items-center justify-center h-full text-destructive bg-muted px-6 text-center gap-2"
+            >
+              <p className="font-mono">{nameRoute.raw}</p>
+              <p className="max-w-prose">{nameRoute.message}</p>
+            </div>
           ) : isJoining ? (
             <div className="flex items-center justify-center h-full text-muted-foreground bg-muted">
               Joining the shared list from your invite link...
@@ -239,6 +280,16 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
           publishContactCard
           fallbackAvatarSrc={blankAvatarImg}
         />
+
+        <div className="mt-6 pt-6 border-t border-border">
+          <h3 className="text-sm font-medium text-foreground mb-3">
+            Namestore
+          </h3>
+          <NamestorePanel
+            namestoreUrl={namestore.url}
+            hive={automergeRepoKeyhive}
+          />
+        </div>
       </Modal>
     </div>
   );

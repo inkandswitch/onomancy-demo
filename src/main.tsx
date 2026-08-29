@@ -16,6 +16,7 @@ import {
 import { Repo } from "@automerge/automerge-repo";
 import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
 import Frame from "./components/Frame.tsx";
+import { initOnomancy } from "./onomancy.ts";
 import { ensurePhonebook } from "./phonebook.ts";
 import * as syncServer from "./syncServer.ts";
 import { log, setDemoLogLevel, type DemoLogLevel } from "./log.ts";
@@ -31,6 +32,9 @@ declare global {
 }
 
 async function start() {
+  // Routes onomancy's Wasm panics to the console instead of losing them.
+  initOnomancy();
+
   const storage = new IndexedDBStorageAdapter();
 
   const { hive, repo } = await initializeAutomergeRepoKeyhive({
