@@ -328,6 +328,7 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
           <NamestorePanel
             namestoreUrl={namestore.url}
             hive={automergeRepoKeyhive}
+            keyhiveVersion={keyhiveVersion}
           />
         </div>
       </Modal>

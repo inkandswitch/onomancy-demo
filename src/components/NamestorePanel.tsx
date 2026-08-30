@@ -4,13 +4,21 @@ import {
   AutomergeRepoKeyhive,
   uint8ArrayToHex,
 } from "@automerge/automerge-repo-keyhive";
-import { CopyableField } from "@automerge/keyhive-react";
+import {
+  AccessEditor,
+  CopyableField,
+  createDocumentTarget,
+} from "@automerge/keyhive-react";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import { bindingRecord } from "../onomancy";
+import blankAvatarImg from "../assets/blankavatar.jpeg";
+import * as syncServer from "../syncServer";
 
 interface NamestorePanelProps {
   namestoreUrl: AutomergeUrl | null;
   hive: AutomergeRepoKeyhive;
+  /** From `useKeyhiveUpdates`, so the member list re-reads as keyhive changes. */
+  keyhiveVersion: number;
 }
 
 /**
@@ -22,7 +30,21 @@ interface NamestorePanelProps {
  * that already had one, which is the property that makes a binding safe to add
  * late and safe to leave off.
  */
-export function NamestorePanel({ namestoreUrl, hive }: NamestorePanelProps) {
+export function NamestorePanel({
+  namestoreUrl,
+  hive,
+  keyhiveVersion,
+}: NamestorePanelProps) {
+  // A namestore is an ordinary keyhive document, so the same target the share
+  // sheet builds for a task list works here unchanged.
+  const target = useMemo(
+    () =>
+      namestoreUrl
+        ? createDocumentTarget(keyhiveRuntime, hive, namestoreUrl)
+        : null,
+    [hive, namestoreUrl]
+  );
+
   const record = useMemo(() => {
     if (!namestoreUrl) return null;
     const documentId = keyhiveRuntime
@@ -67,6 +89,33 @@ export function NamestorePanel({ namestoreUrl, hive }: NamestorePanelProps) {
         the document grants admin to, so it is shared by inviting another admin
         rather than by editing DNS again.
       </p>
+
+      {target && (
+        <div className="pt-3 border-t border-border">
+          <p className="text-sm text-muted-foreground mb-3">
+            Who can read your names. A name resolves only for someone who can
+            read this document, so a published DNS record without readers here
+            resolves for nobody but you. Adding an admin hands them the name.
+          </p>
+
+          {/*
+           * publicAccessLevel="read", never the "edit" default: this is the
+           * document a DNS record designates, so public edit would let any
+           * stranger who resolves a name rewrite the edge and repoint the
+           * domain at a document of their choosing. That is an open redirect
+           * published in DNS, not a public phonebook.
+           */}
+          <AccessEditor
+            target={target}
+            refreshToken={keyhiveVersion}
+            publicAccessLevel="read"
+            labelForMember={(member) =>
+              member.isSyncServer ? syncServer.DISPLAY_NAME : undefined
+            }
+            fallbackAvatarSrc={blankAvatarImg}
+          />
+        </div>
+      )}
     </div>
   );
 }

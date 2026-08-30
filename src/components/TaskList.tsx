@@ -22,6 +22,55 @@ function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
   return a.equals(b);
 }
 
+/** The more permissive of two access levels, or whichever one exists. */
+function betterAccess(
+  a: Access | undefined,
+  b: Access | undefined
+): Access | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return a.atLeast(b) ? a : b;
+}
+
+/**
+ * This identity's effective access to a document, by whichever route grants it.
+ *
+ * Two calls are needed because neither is complete on its own, and keyhive's
+ * own doc comments say so:
+ *
+ * - `bestAccessForDoc` is "the most permissive of `id`'s DIRECT access and the
+ *   document's public access" — so it covers a public document but silently
+ *   misses access held through a group.
+ * - `listMembers` maps `docMemberCapabilities`, which expands groups and keeps
+ *   the level on each member — so it covers the group route, but the public
+ *   agent is a member other than us, so `isSelf` never matches it.
+ *
+ * Using only the first told a legitimate group member "You do not have access",
+ * on a demo whose headline feature is nested groups. Using only the second
+ * would lock everyone out of a publicly shared list. The answer is the union.
+ */
+async function effectiveAccess(
+  hive: AutomergeRepoKeyhive,
+  docUrl: AutomergeUrl
+): Promise<Access | undefined> {
+  const [direct, members] = await Promise.all([
+    hive.bestAccessForDoc(hive.active.individual.id, docUrl),
+    hive.listMembers(docUrl),
+  ]);
+  return betterAccess(direct, members.find((member) => member.isSelf)?.access);
+}
+
+/**
+ * How long a readable document may stay unreceived before we say so.
+ *
+ * Matches the namestore walk's hop timeout, and for the same reason: a
+ * document this device is permitted to read but has not been sent produces no
+ * error and no rejection, just an absence. Waiting forever renders as
+ * "Loading..." and is indistinguishable from ordinary latency — the failure
+ * mode has no stack and no catch, so nothing surfaces it but a clock.
+ */
+const DOC_WAIT_MS = 10_000;
+
 interface TaskListProps {
   docUrl: AutomergeUrl;
   hive: AutomergeRepoKeyhive;
@@ -32,6 +81,16 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [access, setAccess] = useState<Access | undefined>(undefined);
   const [accessChecked, setAccessChecked] = useState(false);
+  // "We could not ask" is not "the answer is no". Tracked separately so the
+  // two are never rendered as the same sentence: a thrown access check used to
+  // land in `access === undefined` and print a flat denial, which is a claim
+  // the app had not earned.
+  const [checkFailed, setCheckFailed] = useState(false);
+  // A document we may read but have not received leaves `useDocument`
+  // returning undefined forever, which renders as an indefinite "Loading...".
+  // Bounding the wait turns a hang into a statement, exactly as the namestore
+  // walk's hop timeout does.
+  const [waitedForDoc, setWaitedForDoc] = useState(false);
 
   // Re-render when the document becomes available so a newly-granted doc
   // renders without a page reload (see useReRenderOnDocProgress).
@@ -53,27 +112,27 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
     if (isUnprotected) {
       setAccess(undefined);
       setAccessChecked(true);
+      setCheckFailed(false);
       return;
     }
 
     async function fetchAccess() {
       try {
-        // The better of this identity's own membership and any public access,
-        // so a publicly-shared document is readable by a peer with no
-        // membership of its own.
-        const best = await hive.bestAccessForDoc(
-          hive.active.individual.id,
-          docUrl
-        );
+        // Direct, public and through-a-group access all count. See
+        // `effectiveAccess`: no single keyhive call covers all three.
+        const best = await effectiveAccess(hive, docUrl);
         // Store a new Access only when it actually differs. Every call returns
         // a fresh object, so setting it unconditionally would re-render on
         // every check, re-run this effect, and never settle.
-        if (!cancelled)
+        if (!cancelled) {
           setAccess((prev) => (sameAccess(prev, best) ? prev : best));
+          setCheckFailed(false);
+        }
       } catch (error) {
         if (!cancelled) {
           log.error("Error checking access level:", error);
           setAccess(undefined);
+          setCheckFailed(true);
         }
       } finally {
         if (!cancelled) setAccessChecked(true);
@@ -87,6 +146,14 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
     };
   }, [keyhiveVersion, docUrl, hive, isUnprotected]);
 
+  // Bound the wait for a document we are allowed to read. Reset per document,
+  // and on keyhive changes, so a late grant or a late replica starts it over.
+  useEffect(() => {
+    setWaitedForDoc(false);
+    const timer = setTimeout(() => setWaitedForDoc(true), DOC_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [docUrl, keyhiveVersion]);
+
   const canRead = isUnprotected || (access?.isReader ?? false);
   const canEdit = isUnprotected || (access?.isEditor ?? false);
   // Relay access doesn't allow you to delegate or revoke, so read access
@@ -95,11 +162,33 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
   const docId = docUrl.replace("automerge:", "");
 
   // Wait for the first access check, and for an accessible document to finish
-  // syncing, before deciding what to show.
-  if (!accessChecked || (canRead && !doc)) {
+  // syncing, before deciding what to show — but only for a bounded time.
+  if (!accessChecked || (canRead && !doc && !waitedForDoc)) {
     return (
       <div className="h-full flex items-center justify-center bg-muted text-muted-foreground">
         Loading...
+      </div>
+    );
+  }
+
+  // Three different unhappy states used to print one sentence. They are not
+  // the same claim, and only the first is about permission at all.
+  const unavailable = checkFailed
+    ? "Could not check your access to this document. That is not a refusal: the" +
+      " check itself failed, most likely because this device is not connected" +
+      " to a sync server. Retrying when the connection returns."
+    : canRead && !doc
+      ? "You have access to this document, but no copy of it has reached this" +
+        " device yet. This is not evidence that it is empty or gone — only that" +
+        " nothing arrived in the time allowed. It will appear if a copy syncs."
+      : null;
+
+  if (unavailable) {
+    return (
+      <div className="h-full flex items-center justify-center bg-muted">
+        <p className="max-w-md px-6 text-center text-sm text-muted-foreground">
+          {unavailable}
+        </p>
       </div>
     );
   }

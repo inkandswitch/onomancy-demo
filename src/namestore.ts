@@ -65,6 +65,23 @@ function remember(
   localStorage.setItem(originKey(identityHex), origin);
 }
 
+function storedOrigin(identityHex: string): Origin | null {
+  const raw = localStorage.getItem(originKey(identityHex));
+  return raw === "auto" || raw === "loaded" ? raw : null;
+}
+
+function forget(identityHex: string): void {
+  localStorage.removeItem(urlKey(identityHex));
+  localStorage.removeItem(originKey(identityHex));
+}
+
+/**
+ * How long an auto-created namestore may fail to load before it is presumed
+ * dead. Deliberately longer than a hop timeout: discarding is destructive and
+ * ordinary sync latency must never reach it.
+ */
+const DEAD_NAMESTORE_MS = 30_000;
+
 export interface Namestore {
   /** Null until the document has been created or read back from storage. */
   url: AutomergeUrl | null;
@@ -123,6 +140,46 @@ export function useNamestore(
       cancelled = true;
     };
   }, [url, repo, hive, identityHex]);
+
+  // Self-heal a dead auto-created namestore.
+  //
+  // An earlier build created these documents empty, and an empty document
+  // never reaches the ready state in the current stack, so some identities
+  // hold a url that will never load. The document is unrecoverable and every
+  // `~` name stays unresolvable behind it, with no user-visible cause.
+  //
+  // Only "auto" urls are discarded. A "loaded" one is a pointer to someone
+  // else's document, where failing to load is ordinary sync latency and
+  // replacing it would silently destroy the reference. That distinction is
+  // the whole reason the origin marker is written, and until now nothing
+  // read it back.
+  useEffect(() => {
+    if (!url || storedOrigin(identityHex) !== "auto") return;
+
+    let cancelled = false;
+    const abort = new AbortController();
+    const giveUp = setTimeout(() => abort.abort(), DEAD_NAMESTORE_MS);
+
+    void (async () => {
+      try {
+        await repo.find<NamestoreDoc>(url, { signal: abort.signal });
+      } catch {
+        // Timed out or rejected: an own document that cannot be loaded is not
+        // coming back. Dropping the url makes the effect above mint a new one.
+        if (cancelled) return;
+        log.error("Discarding a namestore that never loaded:", url);
+        forget(identityHex);
+        setUrl(null);
+      } finally {
+        clearTimeout(giveUp);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(giveUp);
+    };
+  }, [url, repo, identityHex]);
 
   return {
     url,
