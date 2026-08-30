@@ -18,14 +18,16 @@ import {
   Avatar,
   DirectoryProvider,
   Modal,
-  createKeyhiveDesignation,
   useAutomergeDocDirectory,
   useDirectoryEntry,
   useKeyhiveUpdates,
-  useOnomancyDirectory,
   useReRenderOnDocProgress,
   useSelfIdentity,
 } from "@automerge/keyhive-react";
+import {
+  createKeyhiveDesignation,
+  useOnomancyDirectory,
+} from "@automerge/keyhive-react/onomancy";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import { onomancyRuntime } from "../onomancyRuntime";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
@@ -310,6 +312,11 @@ function AppShell({ docUrl, automergeRepoKeyhive }: AppProps) {
           onSaved={() => setIsAccountModalOpen(false)}
           onCancel={() => setIsAccountModalOpen(false)}
           showDnsName
+          // Without this the field canonicalises spelling but cannot tell a
+          // hostname from a typo, so a bad claim is stored and only shows up as
+          // `invalid` once something tries to verify it. Passing the runtime's
+          // version rejects it at entry against onomancy's real grammar.
+          normalizeDnsName={onomancyRuntime.normalizeDnsName}
           publishContactCard
           fallbackAvatarSrc={blankAvatarImg}
         />

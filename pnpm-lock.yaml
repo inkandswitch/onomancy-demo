@@ -28,7 +28,7 @@ catalogs:
 overrides:
   '@automerge/automerge-repo': 2.6.0-subduction.48
   '@automerge/automerge-subduction': 0.16.1
-  '@automerge/keyhive-react': file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz
+  '@automerge/keyhive-react': file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz
 
 importers:
 
@@ -50,8 +50,8 @@ importers:
         specifier: 0.16.1
         version: 0.16.1
       '@automerge/keyhive-react':
-        specifier: file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz
-        version: file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz(@automerge/automerge-repo-keyhive@0.5.0-alpha.6(ws@8.21.0))(@automerge/react@2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@inkandswitch/onomancy@0.1.0)(react@18.3.1)
+        specifier: file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz
+        version: file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz(@automerge/automerge-repo-keyhive@0.5.0-alpha.6(ws@8.21.0))(@automerge/react@2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       '@automerge/react':
         specifier: 'catalog:'
         version: 2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -113,6 +113,9 @@ importers:
       globals:
         specifier: ^15.0.0
         version: 15.15.0
+      playwright:
+        specifier: ^1.62.1
+        version: 1.62.1
       postcss:
         specifier: ^8.5.6
         version: 8.5.6
@@ -175,18 +178,14 @@ packages:
   '@automerge/automerge@3.3.2':
     resolution: {integrity: sha512-9vCdCL7pdQwUra66SBxPVHr+/t9epXKni9KDeak2rNBFMzABVh2u6gSpcwxi3jkR5qr047jVqZv9DlrOfVxLFw==}
 
-  '@automerge/keyhive-react@file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz':
-    resolution: {integrity: sha512-i+5ImSTvSSrD26mx9AqVWgYbIWfvp3uTWJ1j+6eRcZH1Kjor2X+pZTYqEVv8U4BvjKaiXoFw+jeQo4PkcrJEiw==, tarball: file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz}
-    version: 0.1.0-alpha.4
+  '@automerge/keyhive-react@file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz':
+    resolution: {integrity: sha512-MaE9lZXJ/uNErr79JNjSV3dyg48f+b0g6FXNsgGkw2JYPhJJks4bDc7wpgsV0v/ZSaCBHDb4HysfMy2KVcJXSw==, tarball: file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz}
+    version: 0.1.0-alpha.5
     engines: {node: '>=20'}
     peerDependencies:
       '@automerge/automerge-repo-keyhive': '>=0.5.0-alpha.6'
       '@automerge/react': 2.6.0-subduction.48
-      '@inkandswitch/onomancy': ^0.1.0
       react: ^18.3.1
-    peerDependenciesMeta:
-      '@inkandswitch/onomancy':
-        optional: true
 
   '@automerge/react@2.6.0-subduction.48':
     resolution: {integrity: sha512-Fw20NG+ItvF/ZBPMac+33QUwb6fVKx+CK0ARiqNOmuW7lcyFUU14M4trjMX0OCcSTDiZclfe1a+f6RA6IRUEIA==}
@@ -1151,6 +1150,11 @@ packages:
   fraction.js@5.3.4:
     resolution: {integrity: sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ==}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -1417,6 +1421,16 @@ packages:
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
+
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss-import@15.1.0:
     resolution: {integrity: sha512-hpr+J05B2FVYUAXHeK1YyI267J/dDDhMU6B6civm8hSY1jYJnBXxzKDKDswzJmtLHryrjhnDjqqp/49t8FALew==}
@@ -1902,13 +1916,11 @@ snapshots:
 
   '@automerge/automerge@3.3.2': {}
 
-  '@automerge/keyhive-react@file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz(@automerge/automerge-repo-keyhive@0.5.0-alpha.6(ws@8.21.0))(@automerge/react@2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@inkandswitch/onomancy@0.1.0)(react@18.3.1)':
+  '@automerge/keyhive-react@file:../../../.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz(@automerge/automerge-repo-keyhive@0.5.0-alpha.6(ws@8.21.0))(@automerge/react@2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@automerge/automerge-repo-keyhive': 0.5.0-alpha.6(ws@8.21.0)
       '@automerge/react': 2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react: 18.3.1
-    optionalDependencies:
-      '@inkandswitch/onomancy': 0.1.0
 
   '@automerge/react@2.6.0-subduction.48(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
@@ -2846,6 +2858,9 @@ snapshots:
 
   fraction.js@5.3.4: {}
 
+  fsevents@2.3.2:
+    optional: true
+
   fsevents@2.3.3:
     optional: true
 
@@ -3060,6 +3075,14 @@ snapshots:
   pify@2.3.0: {}
 
   pirates@4.0.7: {}
+
+  playwright-core@1.62.1: {}
+
+  playwright@1.62.1:
+    dependencies:
+      playwright-core: 1.62.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   postcss-import@15.1.0(postcss@8.5.6):
     dependencies:

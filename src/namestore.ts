@@ -136,6 +136,22 @@ export function useNamestore(
 }
 
 /**
+ * How long to wait for one hop before calling it unavailable.
+ *
+ * `repo.find` does not fail fast for a document this device is *permitted* to
+ * read but has not received: it waits, indefinitely, for a replica that may
+ * never arrive. Observed against a real DNS-designated namestore that had been
+ * granted public read — before the grant `find` rejected promptly with
+ * "Document is unavailable", after it the same call was still pending at 60
+ * seconds. Without a bound, one such hop hangs the whole walk and the UI sits
+ * on "Resolving..." forever.
+ *
+ * A walk that gives up is reporting `unsynced`, which is exactly true: no
+ * replica arrived in the time allowed. It is not a claim that none exists.
+ */
+const HOP_TIMEOUT_MS = 10_000;
+
+/**
  * The namestore edges of one document, or `undefined` when this device does
  * not hold it.
  *
@@ -148,11 +164,20 @@ export async function edgesOf(
   url: AutomergeUrl
 ): Promise<NamestoreEdges | undefined> {
   let doc: unknown;
+  const abort = new AbortController();
+  const giveUp = setTimeout(
+    () => abort.abort(new Error("hop timed out")),
+    HOP_TIMEOUT_MS
+  );
   try {
-    const handle = await repo.find<NamestoreDoc>(url);
+    // The signal cancels the wait, not the load: a replica that arrives later
+    // is still kept, so retrying the same name can succeed.
+    const handle = await repo.find<NamestoreDoc>(url, { signal: abort.signal });
     doc = handle.doc();
   } catch {
     return undefined;
+  } finally {
+    clearTimeout(giveUp);
   }
   if (typeof doc !== "object" || doc === null) return undefined;
 

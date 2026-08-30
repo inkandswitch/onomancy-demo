@@ -26,12 +26,12 @@ overrides:
   # trees. It is the better artifact regardless: fixed contents, verifiable by
   # checksum, rather than a live view of another tree.
   #
-  #   sha256 ae7c6c1e3ecba58ff4384e9ca4fb292ead1c4b63878bb97d9d750faf0e5f92db
+  #   sha256 344069e7932da4be395d12fd3549fdcc6dd731b2d0aad4250299e96127e34c22
   #
-  # REVERT to `catalog:` once alpha.4 (or later) is published. Until then
+  # REVERT to `catalog:` once a real version is published. Until then
   # `pnpm install --frozen-lockfile` cannot work on a machine without this
   # file, so .github/workflows/deploy.yml and the flake's `ci` are both broken.
-  "@automerge/keyhive-react": "file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.4.tgz"
+  "@automerge/keyhive-react": "file:/home/expede/.pi/bridge/automerge-keyhive-react-0.1.0-alpha.5.tgz"
 
 onlyBuiltDependencies:
   - esbuild
