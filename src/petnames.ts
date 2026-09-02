@@ -1,36 +1,21 @@
 // Petnames: your labels for other people, in a document only you can write.
 //
-// The phonebook is a shared, unprotected map that everyone writes everyone's
-// names into. That is the worst corner of Zooko's triangle — global and
-// memorable but with no authority at all — and it is why the app has to warn
-// that names are forgeable. The forgeability is not inherent to naming; it is
-// a property of that one document's shape.
+// The phonebook is a shared unprotected map that everyone writes everyone's
+// names into — global and memorable with no authority at all, which is why the
+// app has to warn that names are forgeable. Forgeability is a property of that
+// document's shape, not of naming.
 //
-// Onomancy's petname anchoring says what the alternative is:
+// Onomancy's petname anchoring: a `~` name proves that you, holding the keys
+// to your own root document, bound this label to this reference. Nobody else
+// can write that document, so nobody else can forge the label. This applies
+// the same move to people rather than documents.
 //
-//   A `~` name proves exactly this: YOU (whoever controls the signing keys of
-//   this device's root document) previously bound this label to this document
-//   reference. The trust anchor is the user.
+// It does not solve discovery — a petname means nothing to anyone who did not
+// assign it — so this layers over the phonebook rather than replacing it.
 //
-// So a petname cannot be forged by anyone else, because nobody else can write
-// the document it lives in. Applying that to people rather than documents is
-// the same move: your label for someone belongs in your namestore.
-//
-// ## What this does NOT solve
-//
-// Discovery. A petname is meaningful only to the person who assigned it, so it
-// cannot help you find somebody you have never labelled. That is what the
-// phonebook is actually for, and why this layers over it rather than replacing
-// it: petnames win where you have one, the shared map answers where you do not.
-//
-// ## Why your own entry still goes to the phonebook
-//
-// Two different operations were conflated in one `publish`. Labelling *someone
-// else* is a petname — private, authoritative for you alone. Publishing *your
-// own* name is the opposite: an assertion you want others to read, which has
-// to live somewhere they can reach. So self-entries route to the shared map
-// and remain self-asserted, while everything you say about other people
-// becomes unforgeable.
+// Your own entry still goes to the phonebook, because labelling someone else
+// and publishing your own name are opposite operations: the first is private
+// and authoritative, the second is an assertion others must be able to reach.
 
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
 import type { DirectoryEntry, NameDirectory } from "@automerge/keyhive-react";

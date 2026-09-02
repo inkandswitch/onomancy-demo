@@ -180,52 +180,24 @@ function recordsOf(outcome: unknown): string[] {
 }
 
 /*
- * BEFORE ADOPTING `verifyCertificate`, read this. None of it is in the
- * package's types, and three of the four fail in the direction that looks
- * fine. Recorded here rather than when we adopt, because the mistakes are
- * available the moment someone reaches for that entry point.
+ * `verifyCertificate` reports refusal by THROWING, not by returning a verdict.
+ * A catch that treats exceptions as transport failures reads "this key was
+ * revoked" as "the network is down" and retries forever against a certificate
+ * that cannot verify while the chain stays fresh. Distinguish refusal from
+ * transport before adding any retry: a `RefusalError` carries `reason`.
  *
- * Observed against onomancy `0.1.0`, sha256 2d8eab4f…, using two real
- * certificates. `0.1.0` has named at least four distinct artifacts, so pin
- * the sha before trusting any of this.
- *
- * 1. `freshness` is a VALUE here and an EXCEPTION there. `resolveHostname`
- *    returns fresh/stale/deferred; `verifyCertificate` returns fresh and
- *    stale but THROWS for deferred. A three-way handler moved to the other
- *    entry point silently loses one branch — and it loses the only branch
- *    whose remedy the user can act on, since deferred nearly always means a
- *    local clock running ahead. Nobody notices a state that never occurs.
- *
- * 2. `generation` is an OPEN string, not the documented two-value union.
- *    Observed values are `on-path` and `provisional`; `off-path` did not
- *    appear in any grading and may be a refusal rather than a value. Match
- *    `on-path` explicitly, treat anything else as not established, and log
- *    what arrived. The values appear in no shipped artifact — the `.d.ts`
- *    refers to a Rust doc link that did not survive into TypeScript.
- *
- * 3. Strictness INVERTS with freshness, deliberately. A fresh chain is
- *    authoritative enough to convict, so an off-path signer on a fresh chain
- *    is refused outright — that is revocation working. A stale chain cannot
- *    convict, so the same certificate grades `provisional`. Anyone writing
- *    `if (fresh) accept` has it exactly backwards.
- *
- * 4. That refusal arrives as a THROW. A catch that treats exceptions as
- *    transport failures will read "this key was revoked" as "the network is
- *    down" and retry forever against a certificate that cannot verify while
- *    the chain stays fresh. Distinguish refusal from transport before adding
- *    any retry.
+ * Strictness rises with freshness, which is easy to get backwards. A fresh
+ * chain is authoritative enough to convict, so an off-path signer on one is
+ * refused outright; the same certificate on a stale chain grades
+ * `provisional`.
  */
 
 /**
- * The chain's freshness grade, when the installed build reports one.
+ * The chain's freshness grade.
  *
- * Optional on purpose: the field is absent from earlier builds of the same
- * `0.1.0` version, so its absence means "this build does not grade" rather
- * than "the chain is not fresh". Absence of a verdict is not a verdict.
- *
- * Removable once we pin a build that always grades — unlike `recordsOf`'s
- * probing, which is about `resolveHostname` returning `any` and does not
- * expire with a pin. Two guards that look alike and end on different events.
+ * Typed as required since onomancy 0.2.0, but read structurally anyway: this
+ * is a wasm boundary and the probe is a line. Absence means "did not grade",
+ * never "not fresh".
  */
 function freshnessOf(outcome: unknown): string | undefined {
   if (typeof outcome !== "object" || outcome === null) return undefined;

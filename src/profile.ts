@@ -1,32 +1,20 @@
 // Self-published profiles: your own name and avatar, in your own document.
 //
-// The phonebook is one shared unprotected map that everyone writes everyone's
-// entries into, so anyone holding its id can rename anyone. Petnames fixed the
-// half of that which is *your labels for other people*. This fixes the other
-// half — *your own* name, which is an assertion you want others to read and so
-// cannot simply be kept private.
+// Petnames cover your labels for other people. This covers your own name,
+// which is an assertion others must be able to read and so cannot be kept
+// private.
 //
-// ## The discovery problem, and why a pointer is enough
+// To read your profile I must know which document holds it, and a pointer in
+// the shared phonebook is as forgeable as the name was. But a forged pointer
+// is detectable where a forged name is not: the profile document is a keyhive
+// document, so its members are checkable.
 //
-// To read your profile I must know which document holds it. Putting that
-// pointer in the shared phonebook makes it exactly as forgeable as the name
-// was: an attacker rewrites your pointer to a document they control, and their
-// profile answers for you.
-//
-// A forged pointer is *detectable*, though, which a forged name is not. The
-// profile document is a keyhive document, and its admins are checkable. So:
-//
-//   trust this profile  <=>  the identity claiming it is an admin of the
+//   trust this profile  <=>  the identity claiming it is a member of the
 //                            document it is published in
 //
-// A pointer to an attacker's document fails, because the victim's identity is
-// not an admin there. A pointer to a document nobody administers fails. The
-// pointer being forgeable stops mattering, in the same way the phonebook
-// holding a forgeable DNS *claim* stopped mattering once the badge came from
-// DNSSEC rather than from the document.
-//
-// This is the reverse-binding pattern one layer down: the shared map carries
-// the claim, and the claimed document supplies the authority.
+// A pointer at an attacker's document fails, because the victim is not a
+// member there. The reverse-binding pattern one layer down: the shared map
+// carries the claim, the claimed document supplies the authority.
 
 import { useEffect, useMemo, useState } from "react";
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";

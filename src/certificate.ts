@@ -267,28 +267,9 @@ export function useDocumentClaim(
  * that arrived and failed verification is different in kind, and that one does
  * convict.
  *
- * ## Consequence: the "solo case" stops verifying, and should
- *
- * `createKeyhiveDesignation` short-circuits when a bound id *is* the identity,
- * on the stated grounds that "a domain may anchor the key directly rather than
- * a document". Wrapping it here makes that `unknown`, because a bare key holds
- * no certificate and there is no reverse binding to find.
- *
- * That is not a regression. **The spec does not define that configuration.**
- * `dns-anchor.md:72`: "`p` MUST be the base64 encoding of the 32-byte root
- * document ID", and `certificate.md`'s `root_doc` "must equal the pubkey in
- * the zone's TXT record". `p=` names a document, always.
- *
- * The word "solo" in the spec is about a different field entirely — `g=`, the
- * generation key: "a solo publisher MAY attest their admin key directly
- * (`doc -> admin`, chain trivially passes through)". That is guidance about
- * the delegation chokepoint, not permission for `p=` to name an individual.
- * The two got conflated somewhere upstream of here.
- *
- * The practical form is the ordinary one: point `p=` at a document you
- * control, put the certificate in it, and a reviewer replicates that document
- * to check. There is no configuration in which a solo publisher needs to skip
- * the document — a document is what makes the binding checkable by anyone.
+ * One consequence: `createKeyhiveDesignation` short-circuits when a bound id
+ * *is* the identity, and wrapping it makes that case `unknown` — a bare key
+ * holds no certificate. That is correct; `p=` names a document. See ADR-031.
  */
 export function requireReverseBinding(
   repo: Repo,

@@ -20,7 +20,7 @@ overrides:
   # TEMPORARY. A link is a live view of a tree that can move without warning,
   # so this breaks reproducibility: `pnpm install --frozen-lockfile` cannot
   # work on a machine without the sibling checkout, which is why
-  # .github/workflows/deploy.yml and the flake.s `ci` are broken.
+  # .github/workflows/deploy.yml and the flake's `ci` are broken.
   #
   # It is here because keyhive-react is being changed *for* this demo, and a
   # published snapshot per change would cost a verification round each time.

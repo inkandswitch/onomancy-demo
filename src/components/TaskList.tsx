@@ -26,37 +26,19 @@ function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
 /**
  * This identity's effective access to a document, by whichever route grants it.
  *
- * ## One query, not a union
+ * One query, not a union: `bestAccessForDoc` calls `transitive_members()` and
+ * covers direct membership, group-mediated membership, and public access.
+ * `listMembers().find(isSelf)` is a strict subset, being public-blind.
  *
- * `bestAccessForDoc` calls `transitive_members()` and covers all three axes:
- * direct membership, group-mediated membership, and the document's public
- * access. Nothing needs to be unioned with it.
+ * Do not trust the naming. `accessForDoc` is documented as "`id`'s **direct**
+ * access" while its implementation is transitive, and `bestAccessForDoc`'s own
+ * local variable is called `direct` while holding a transitive lookup.
  *
- * Do not trust the naming here. `accessForDoc` is documented as "`id`'s
- * **direct** access" while its implementation is transitive, and
- * `bestAccessForDoc`'s own local variable is named `direct` while holding a
- * transitive lookup. Documentation that is
- * confidently wrong is worse than none, because there is nothing to prompt a
- * reader to check.
- *
- * Measured here rather than accepted on report: an identity reaching a
- * document *only* through a group — `members()` does not contain it — reads
- * `Admin` from `bestAccessForDoc`. `listMembers().find(isSelf)` is a strict
- * subset, being public-blind, so the union could only ever return what the
- * single call already returns.
- *
- * ## The symptom that motivated the union WAS real, and its cause is unknown
- *
- * The note this replaces recorded a legitimate group member being told "You do
- * not have access". That was observed, not theorised. But the mechanism it was
- * attributed to does not exist, so **the cause of that symptom is currently
- * unexplained** — it was not group-blindness here.
- *
- * Left stated rather than deleted: a fix whose recorded reason is false is one
- * nobody can safely revisit, and quietly removing the explanation would leave
- * the next reader with a working call and no idea what it once failed to do.
- * Candidates not ruled out: the separate `keyhiveVersion` timer-reset defect
- * fixed below, or a stack version that has since moved.
+ * A legitimate group member was once told "You do not have access". That was
+ * observed, but not caused by group-blindness here, and its real cause is
+ * still unknown — possibly the `keyhiveVersion` timer-reset defect fixed
+ * below. Recorded because a fix whose stated reason is false is one nobody can
+ * safely revisit.
  */
 async function effectiveAccess(
   hive: AutomergeRepoKeyhive,
