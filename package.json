@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "check:linked": "node scripts/check-linked-freshness.mjs",
     "gen:phonebook-id": "node scripts/generate-phonebook-id.mjs",
     "lint": "eslint . && prettier --check \"**/*.{ts,tsx,js,mjs}\"",
     "lint:fix": "eslint . --fix && prettier --write \"**/*.{ts,tsx,js,mjs}\"",

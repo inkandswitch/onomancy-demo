@@ -189,22 +189,68 @@ An identity can claim a DNS name in the account modal, and it shows up beside
 them in the share modal and the contact search. A claim is only a claim until
 it is checked, so it carries a status:
 
-| Badge         | Means                                                                                            |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `verified`    | A DNSSEC-validated `_onomancy` record for that domain designates this identity.                  |
-| `mismatch`    | The domain's record designates somebody else. The claim is false.                                |
-| `unreachable` | The domain published nothing usable, or could not be reached.                                    |
-| `unsynced`    | The domain designates a document this device has not synced, so the claim cannot be checked yet. |
-| `pending`     | The check is still running.                                                                      |
-| `invalid`     | Not a DNS name at all.                                                                           |
+| Badge          | Means                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `verified`     | A DNSSEC-valid `_onomancy` record designates a document this identity administers. See below — it is narrower than it sounds. |
+| `mismatch`     | The domain's record designates somebody else. The claim is false.                                                             |
+| `contested`    | Two records of equal precedence name different documents. Misconfigured, not unclaimed.                                       |
+| `chain-failed` | Records arrived and failed validation. A security signal, not a network one.                                                  |
+| `replayed`     | A stale chain carried a serial no higher than one already accepted. A replay.                                                 |
+| `deferred`     | Every record is dated past the skew bound. Usually your clock, not an attack.                                                 |
+| `no-claim`     | DNS answered; the domain simply publishes no binding.                                                                         |
+| `offline`      | The domain could not be reached. Retrying may work.                                                                           |
+| `malformed`    | Not a usable hostname. The fix is in the input box.                                                                           |
+| `unsynced`     | The domain designates a document this device has not synced, so the claim cannot be checked yet.                              |
+| `pending`      | The check is still running.                                                                                                   |
+| `invalid`      | Not a DNS name at all.                                                                                                        |
+
+Most of these exist because one status used to cover them all, and it told
+every user their network was at fault — over a typo, over a domain that makes
+no claim, and over a zone whose records failed validation. **They are split by
+remedy**: retry, fix the input, tell the domain owner, or treat as a possible
+attack. A single "unreachable" made the last of those look like the first.
+
+### Replays, and why the bound comes first
+
+`replayed` is the serial ratchet: a resolver remembers the highest serial it
+has accepted for a name, and a record arriving on a stale chain with a serial
+no higher than that is a replay of something already superseded. Selection
+within one DNS answer cannot catch this — the attack is one record at a time,
+across two queries, never two records in one response.
+
+`deferred` is what makes the ratchet safe to have at all, and the order is
+load-bearing. A serial dated far in the future is set aside before selection,
+so it never becomes the winner and never reaches the ratchet. **Without that
+bound, one forged far-future serial jams the ratchet at a value nothing honest
+will ever exceed, and every legitimate record afterwards reads as a replay** —
+the defence becomes the attack, while appearing to work. A poisoned name is
+bounded to roughly five minutes ahead of the clock, and any record on a fresh
+chain can move the ratchet back down to heal it.
+
+So the ratchet is deliberately **not** a monotone maximum. Freshness outranks
+it, which is also what lets a domain change hands legitimately.
 
 ### What a verified badge proves, exactly
 
-That the domain, as attested by a DNSSEC chain from the IANA root key, during
-the window that chain's signatures were valid, designated this identity.
+That the domain, as attested by a DNSSEC chain from the IANA root key during
+the window that chain's signatures were valid, designated a document that this
+identity holds admin access on.
 
-That is all. In particular it does **not** prove:
+That is all, and it is **one-directional**. In particular it does **not**
+prove:
 
+- **That the document accepts the domain.** No onomancy certificate is
+  consulted. A domain may unilaterally name any document id, and that
+  document's admins cannot decline — under the protocol the document _speaks_,
+  and refusing to sign a certificate is how it declines. Here the only thing
+  preventing a badge is the identity not claiming the name. So consent is
+  present, in a weak sense, and not in the sense the protocol means.
+- **That anyone else could check it.** A certificate is self-authenticating:
+  it verifies from bytes that arrived by any route, so it can be gossiped. This
+  verdict is _local_ — it needs the designated document replicated here and
+  keyhive state present. A third party cannot be shown why the badge was
+  earned. That is a different kind of claim, not a smaller amount of the same
+  one.
 - That the person behind the identity is who you think. It proves control of a
   domain, not identity.
 - Anything about the domain owner's intentions, or that they meant to vouch for
@@ -214,16 +260,28 @@ That is all. In particular it does **not** prove:
 - That the binding is current. DNSSEC signatures have validity windows, and a
   chain is graded for freshness rather than treated as timeless.
 
-### The two verdicts that are not evidence
+The stronger, certificate-backed claim is the one the **banner above a
+name-resolved list** reports, and it is a separate check — see "Names" above.
+A document can carry a verified certificate while none of its admins claim the
+domain, and an identity can carry this badge while the document has certified
+nothing. They are different questions about the same pair.
 
-`unreachable` and `unsynced` are not weak versions of `mismatch`. They are the
-absence of an answer, and the demo keeps them visually distinct from it for
-that reason. A domain that is down, or a namestore that has not arrived, tells
-you nothing about whether the claim is true — treating either as suspicion
-would punish people for network conditions.
+### The verdicts that are not evidence
+
+`offline`, `no-claim` and `unsynced` are not weak versions of `mismatch`. They
+are the absence of an answer, and the demo keeps them visually distinct from it
+for that reason. A domain that is down, one that never made a claim, or a
+namestore that has not arrived tells you nothing about whether the claim is
+true — treating any of them as suspicion would punish people for network
+conditions.
 
 `mismatch` is different. It means a record was fetched, validated, and
 designates someone else. That is a real answer, and a negative one.
+
+`chain-failed` is different again, and is the one to take seriously. Records
+arrived and failed validation, which is what tampering looks like. It sits on
+the security axis, not the connectivity one, and grouping it with `offline`
+would render a possible attack as "try again later".
 
 ### A claim is forgeable; a badge is not
 
@@ -231,8 +289,8 @@ Claims live in the phonebook, which is unencrypted and writable by anyone
 holding its id, so anyone can write any claim into anyone's entry. This is
 safe, and it is the architecture working rather than a gap in it: the badge is
 not read from the phonebook. It comes from resolving the domain and checking
-what that domain designates. A forged claim renders `mismatch` or
-`unreachable`. Nobody can write their way to `verified`.
+what that domain designates. A forged claim renders `mismatch` or `no-claim`.
+Nobody can write their way to `verified`.
 
 The document carries the assertion. DNS carries the authority.
 

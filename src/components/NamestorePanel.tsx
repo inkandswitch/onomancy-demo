@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useRepo } from "@automerge/react";
 import { AutomergeUrl } from "@automerge/react/slim";
 import {
   AutomergeRepoKeyhive,
@@ -11,8 +12,10 @@ import {
 } from "@automerge/keyhive-react";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import { bindingRecord } from "../onomancy";
+import { serialForBody } from "../namestore";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import * as syncServer from "../syncServer";
+import { CertificateBox } from "./CertificateBox";
 
 interface NamestorePanelProps {
   namestoreUrl: AutomergeUrl | null;
@@ -35,6 +38,7 @@ export function NamestorePanel({
   hive,
   keyhiveVersion,
 }: NamestorePanelProps) {
+  const repo = useRepo();
   // A namestore is an ordinary keyhive document, so the same target the share
   // sheet builds for a task list works here unchanged.
   const target = useMemo(
@@ -50,7 +54,12 @@ export function NamestorePanel({
     const documentId = keyhiveRuntime
       .docIdFromAutomergeUrl(namestoreUrl)
       .toBytes();
-    return bindingRecord(hive.active.individual.id.toBytes(), documentId);
+    const generationKey = hive.active.individual.id.toBytes();
+    // The serial is derived from the body and remembered, so reopening this
+    // panel shows the record the user may already have published rather than a
+    // freshly minted one. Only a changed binding earns a new serial.
+    const body = bindingRecord(generationKey, documentId, 0n);
+    return bindingRecord(generationKey, documentId, serialForBody(body));
   }, [namestoreUrl, hive]);
 
   if (!namestoreUrl) {
@@ -116,6 +125,8 @@ export function NamestorePanel({
           />
         </div>
       )}
+
+      <CertificateBox repo={repo} hive={hive} defaultTarget={namestoreUrl} />
     </div>
   );
 }

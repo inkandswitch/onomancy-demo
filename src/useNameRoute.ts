@@ -21,7 +21,13 @@ import { errorMessage, log } from "./log";
 export type NameRoute =
   | { status: "none" }
   | { status: "resolving"; name: ParsedName }
-  | { status: "resolved"; name: ParsedName; url: AutomergeUrl }
+  | {
+      status: "resolved";
+      name: ParsedName;
+      url: AutomergeUrl;
+      /** The document the walk began at — where a `@host` certificate lives. */
+      root: AutomergeUrl;
+    }
   | {
       status: "partial";
       name: ParsedName;
@@ -81,11 +87,11 @@ export function useNameRoute(
     setRoute({ status: "resolving", name });
 
     resolveName(repo, name, localRoot)
-      .then((resolution) => {
+      .then(({ root, resolution }) => {
         if (cancelled) return;
         setRoute(
           resolution.status === "resolved"
-            ? { status: "resolved", name, url: resolution.url }
+            ? { status: "resolved", name, url: resolution.url, root }
             : { status: "partial", name, resolution }
         );
       })

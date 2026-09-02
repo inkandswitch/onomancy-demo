@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Access,
   AutomergeRepoKeyhive,
+  docIdFromAutomergeUrl,
   isUnprotectedDoc,
 } from "@automerge/automerge-repo-keyhive";
 import { useReRenderOnDocProgress } from "@automerge/keyhive-react";
@@ -22,42 +23,64 @@ function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
   return a.equals(b);
 }
 
-/** The more permissive of two access levels, or whichever one exists. */
-function betterAccess(
-  a: Access | undefined,
-  b: Access | undefined
-): Access | undefined {
-  if (!a) return b;
-  if (!b) return a;
-  return a.atLeast(b) ? a : b;
-}
-
 /**
  * This identity's effective access to a document, by whichever route grants it.
  *
- * Two calls are needed because neither is complete on its own, and keyhive's
- * own doc comments say so:
+ * ## This was a union, and the reason it was a union was false
  *
- * - `bestAccessForDoc` is "the most permissive of `id`'s DIRECT access and the
- *   document's public access" — so it covers a public document but silently
- *   misses access held through a group.
- * - `listMembers` maps `docMemberCapabilities`, which expands groups and keeps
- *   the level on each member — so it covers the group route, but the public
- *   agent is a member other than us, so `isSelf` never matches it.
+ * It previously took the better of `bestAccessForDoc` and
+ * `listMembers().find(isSelf)`, on the stated grounds that the first was
+ * group-blind. **It is not.** `bestAccessForDoc` calls `transitive_members()`
+ * and covers all three axes: direct membership, group-mediated membership, and
+ * the document's public access.
  *
- * Using only the first told a legitimate group member "You do not have access",
- * on a demo whose headline feature is nested groups. Using only the second
- * would lock everyone out of a publicly shared list. The answer is the union.
+ * The false belief came from two agreeing signals, both readable and both
+ * wrong: `accessForDoc` is documented as "`id`'s **direct** access" while its
+ * implementation is transitive, and `bestAccessForDoc`'s own local variable is
+ * named `direct` while holding a transitive lookup. Documentation that is
+ * confidently wrong is worse than none, because there is nothing to prompt a
+ * reader to check.
+ *
+ * Measured here rather than accepted on report: an identity reaching a
+ * document *only* through a group — `members()` does not contain it — reads
+ * `Admin` from `bestAccessForDoc`. `listMembers().find(isSelf)` is a strict
+ * subset, being public-blind, so the union could only ever return what the
+ * single call already returns.
+ *
+ * ## The symptom that motivated the union WAS real, and its cause is unknown
+ *
+ * The note this replaces recorded a legitimate group member being told "You do
+ * not have access". That was observed, not theorised. But the mechanism it was
+ * attributed to does not exist, so **the cause of that symptom is currently
+ * unexplained** — it was not group-blindness here.
+ *
+ * Left stated rather than deleted: a fix whose recorded reason is false is one
+ * nobody can safely revisit, and quietly removing the explanation would leave
+ * the next reader with a working call and no idea what it once failed to do.
+ * Candidates not ruled out: the separate `keyhiveVersion` timer-reset defect
+ * fixed below, or a stack version that has since moved.
  */
 async function effectiveAccess(
   hive: AutomergeRepoKeyhive,
   docUrl: AutomergeUrl
 ): Promise<Access | undefined> {
-  const [direct, members] = await Promise.all([
-    hive.bestAccessForDoc(hive.active.individual.id, docUrl),
-    hive.listMembers(docUrl),
-  ]);
-  return betterAccess(direct, members.find((member) => member.isSelf)?.access);
+  // `bestAccessForDoc` alone. It is complete on all three axes — direct
+  // membership, group-mediated membership, and the document's public access —
+  // so nothing needs to be unioned with it.
+  //
+  // This used to take the better of it and `listMembers().find(isSelf)`, on the
+  // belief that the first was group-blind and the two had complementary blind
+  // spots. That belief came from a doc comment, and the doc comment is wrong:
+  // `accessForDoc` is documented as "`id`'s **direct** access" and its
+  // implementation calls `transitive_members()`, as does `bestAccessForDoc` —
+  // whose own local variable is named `direct` while holding a transitive
+  // lookup. Two readable signals, both agreeing, both false.
+  //
+  // Measured here rather than taken on report: an identity reaching a document
+  // *only* through a group, never a direct member, reads `Admin` from both
+  // calls. `listMembers().find(isSelf)` is a strict subset — it is public-blind
+  // — so the union could only ever return what this returns.
+  return hive.bestAccessForDoc(hive.active.individual.id, docUrl);
 }
 
 /**
@@ -86,6 +109,9 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
   // land in `access === undefined` and print a flat denial, which is a claim
   // the app had not earned.
   const [checkFailed, setCheckFailed] = useState(false);
+  // Keyhive has no state for this document at all 2014 a different thing from
+  // being denied, and the only one of the two with no remedy.
+  const [unknownToKeyhive, setUnknownToKeyhive] = useState(false);
   // A document we may read but have not received leaves `useDocument`
   // returning undefined forever, which renders as an indefinite "Loading...".
   // Bounding the wait turns a hang into a statement, exactly as the namestore
@@ -121,12 +147,27 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
         // Direct, public and through-a-group access all count. See
         // `effectiveAccess`: no single keyhive call covers all three.
         const best = await effectiveAccess(hive, docUrl);
-        // Store a new Access only when it actually differs. Every call returns
-        // a fresh object, so setting it unconditionally would re-render on
-        // every check, re-run this effect, and never settle.
+        // Whether keyhive has any state for this document at all.
+        //
+        // Distinct from "we are not a member", and the two are indistinguishable
+        // from access alone — both leave `best` undefined. A document keyhive
+        // has never heard of is not one we were denied: nobody can grant access
+        // to it, no replica can arrive, and waiting cannot help. Telling a
+        // reader "you do not have access" points them at a remedy that does not
+        // exist.
+        //
+        // Reachable in practice: an id minted outside keyhive is classified as
+        // protected by shape (ADR-023), so an onomancy-bound document imported
+        // here lands in exactly this state.
+        const known = await hive.keyhive
+          .getDocument(docIdFromAutomergeUrl(docUrl))
+          .then((d) => Boolean(d))
+          .catch(() => false);
+
         if (!cancelled) {
           setAccess((prev) => (sameAccess(prev, best) ? prev : best));
           setCheckFailed(false);
+          setUnknownToKeyhive(!known);
         }
       } catch (error) {
         if (!cancelled) {
@@ -146,13 +187,22 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
     };
   }, [keyhiveVersion, docUrl, hive, isUnprotected]);
 
-  // Bound the wait for a document we are allowed to read. Reset per document,
-  // and on keyhive changes, so a late grant or a late replica starts it over.
+  // Bound the wait for a document we are allowed to read.
+  //
+  // Keyed on the document alone, NOT on `keyhiveVersion`. That counter is
+  // bumped by `useKeyhiveUpdates` on every remote ingest, debounced at 100ms,
+  // so any device receiving anything at all restarts this timer faster than it
+  // can fire — disabling the bound in exactly the case it exists for, since a
+  // device syncing other documents is the normal one. It is a heartbeat, not a
+  // version: safe to re-read on, unsafe to reset a timer on.
+  //
+  // Nothing is lost by leaving it out. A late grant flips `canRead` and a late
+  // replica defines `doc`; both exit this branch on their own.
   useEffect(() => {
     setWaitedForDoc(false);
     const timer = setTimeout(() => setWaitedForDoc(true), DOC_WAIT_MS);
     return () => clearTimeout(timer);
-  }, [docUrl, keyhiveVersion]);
+  }, [docUrl]);
 
   const canRead = isUnprotected || (access?.isReader ?? false);
   const canEdit = isUnprotected || (access?.isEditor ?? false);
@@ -217,7 +267,9 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
               </div>
               <div className="text-center py-8">
                 <p className="text-muted-foreground">
-                  You do not have access to this document
+                  {unknownToKeyhive
+                    ? "This document is unknown to keyhive on this device — it has no access control here, so no one can grant you access and no replica can arrive. It was most likely created outside keyhive."
+                    : "You do not have access to this document"}
                 </p>
               </div>
             </div>

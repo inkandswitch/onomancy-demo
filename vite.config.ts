@@ -3,8 +3,57 @@ import react from "@vitejs/plugin-react";
 import wasm from "vite-plugin-wasm";
 // The slim entry so loading this config does not initialize the Automerge WASM.
 import { isValidAutomergeUrl } from "@automerge/automerge-repo/slim";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Where a package's files really live, following symlinks.
+//
+// During development some dependencies are `link:`ed to sibling checkouts, so
+// their real files sit outside this project root. The dev server refuses to
+// serve anything outside `server.fs.allow`, which breaks onomancy's Wasm fetch
+// with "outside of Vite serving allow list" — a **dev-only** failure, because
+// `vite build` copies assets into `dist/` rather than serving them from disk.
+// So a production build stays green while the dev server cannot start the app,
+// which is a confusing pair of symptoms for one cause.
+//
+// Derived rather than hardcoded: when a package is installed normally this
+// resolves inside node_modules and is already allowed, so the entry is
+// harmless and nothing has to be remembered when the links are reverted.
+function packageRoots(specifiers: string[]): string[] {
+  return specifiers.flatMap((specifier) => {
+    let entry: string;
+    try {
+      entry = fileURLToPath(import.meta.resolve(specifier));
+    } catch (error) {
+      // Not installed at all. Nothing to allow, and nothing wrong.
+      void error;
+      return [];
+    }
+
+    // Walk up from the resolved entry to the directory holding its
+    // package.json. Resolving `${specifier}/package.json` directly would be
+    // shorter and does not work: an `exports` map without a "./package.json"
+    // entry makes it unresolvable, which is exactly the case for
+    // @inkandswitch/onomancy. That failure is silent and leaves the package
+    // missing from the allow list, so the dev server 403s on its Wasm while
+    // every other gate stays green.
+    let dir = realpathSync(dirname(entry));
+    for (;;) {
+      if (existsSync(resolve(dir, "package.json"))) return [dir];
+      const parent = dirname(dir);
+      if (parent === dir) {
+        // Should be unreachable: something resolved, so a manifest exists
+        // above it. Loud rather than silent, because the symptom otherwise
+        // appears only in dev and only as a 403 on one asset.
+        throw new Error(
+          `Could not find the package root for "${specifier}" above ${entry}`
+        );
+      }
+      dir = parent;
+    }
+  });
+}
 
 // Force a single copy of the automerge and subduction modules, resolved from
 // this project's node_modules. `automerge-repo-keyhive` brings its own copies,
@@ -91,6 +140,15 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5557,
       open: true,
+      fs: {
+        allow: [
+          process.cwd(),
+          ...packageRoots([
+            "@inkandswitch/onomancy",
+            "@automerge/keyhive-react",
+          ]),
+        ],
+      },
       watch: {
         ignored: ["!**/node_modules/@automerge/automerge-repo-keyhive/**"],
       },

@@ -35,12 +35,28 @@ export async function resolvePath(
  *
  * `localRoot` is this identity's namestore, needed only for `~` names.
  */
+export interface NameResolution {
+  /**
+   * The document the walk started from.
+   *
+   * Carried out rather than discarded because it is the document a `@host`
+   * name's certificate lives in — the one DNS designates, not the one the walk
+   * ends at. Recomputing it would mean a second DoH round trip and, worse,
+   * would invite verifying the certificate against the wrong document: the
+   * final target is whatever the last edge pointed at, which has no claim on
+   * the hostname and no reason to carry evidence about it.
+   */
+  root: AutomergeUrl;
+  resolution: Resolution;
+}
+
 export async function resolveName(
   repo: Repo,
   name: ParsedName,
   localRoot: AutomergeUrl | null
-): Promise<Resolution> {
-  return resolvePath(repo, await rootOf(name, localRoot), name.segments);
+): Promise<NameResolution> {
+  const root = await rootOf(name, localRoot);
+  return { root, resolution: await resolvePath(repo, root, name.segments) };
 }
 
 /**
@@ -66,10 +82,10 @@ export async function rootOf(
 
     case "dns": {
       const { hostname } = name.anchor;
-      const bound = await resolveBoundDocuments(hostname);
-      // More than one during a migration's dual-publish window. The first is
-      // the one to walk; the rest are the same namespace by another id.
-      const [root] = bound;
+      // At most one: `resolveBoundDocuments` selects by generation and
+      // declines to choose when the newest is contested, so there is no
+      // "first" to take here and no wire order to depend on.
+      const [root] = await resolveBoundDocuments(hostname);
       if (root === undefined) {
         throw new Error(
           `${hostname} publishes no usable onomancy binding. It needs a DNSSEC-signed _onomancy TXT record.`
