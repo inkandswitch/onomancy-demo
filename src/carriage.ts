@@ -6,9 +6,9 @@
 // Keyhive's `JsEvent.toBytes()` produces exactly that encoding, so extraction
 // is a filter over events keyhive already holds rather than anything minted.
 //
-// UNEXERCISED. Nothing here has produced a certificate that verified, because
-// the encode side does not exist yet upstream. It is written from measurements
-// and from onomancy's mint, and the first real attempt may well correct it.
+// UNEXERCISED: no certificate built from this has yet been accepted by a
+// verifier. The encoder accepts the entries; that is the encoder.s opinion of
+// them, not a verifier.s.
 
 import type { AutomergeUrl } from "@automerge/react/slim";
 import {
@@ -61,9 +61,9 @@ function hex(bytes: Uint8Array): string {
  * age rather than with the document. Seven ops on a fresh identity is the
  * floor, not the shape: an identity that has rotated keys many times carries a
  * proportionally larger introduction set, while the delegations for any one
- * document stay at two. Measured today the carriage is 1450 bytes against a
- * 2577-byte DNSSEC chain — the chain still dominates, but only at 1.8x, and
- * that ratio moves one way over time.
+ * document stay at two. On a fresh identity the carriage runs around 1.5 KB
+ * against a 2.5 KB DNSSEC chain: the chain dominates, but only by about 1.8x,
+ * and that ratio moves one way over time.
  *
  * There is a hard ceiling at `MAX_UNIT_BYTES = 1 << 20`, so nothing breaks
  * quietly — an oversize unit fails loudly at signing rather than silently at

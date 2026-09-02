@@ -204,11 +204,11 @@ it is checked, so it carries a status:
 | `pending`      | The check is still running.                                                                                                   |
 | `invalid`      | Not a DNS name at all.                                                                                                        |
 
-Most of these exist because one status used to cover them all, and it told
-every user their network was at fault — over a typo, over a domain that makes
-no claim, and over a zone whose records failed validation. **They are split by
-remedy**: retry, fix the input, tell the domain owner, or treat as a possible
-attack. A single "unreachable" made the last of those look like the first.
+**They are split by remedy**: retry, fix the input, tell the domain owner, or
+treat as a possible attack. One status covering all of them tells every user
+their network is at fault — over a typo, over a domain that makes no claim,
+and over a zone whose records failed validation — which makes an attack look
+like an outage.
 
 ### Replays, and why the bound comes first
 

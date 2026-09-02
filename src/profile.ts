@@ -95,25 +95,16 @@ export type ProfileVerdict =
  * and the identity is demonstrably not among its admins. Absence of evidence
  * is not evidence of absence, here as everywhere else.
  *
- * **`impostor` is reachable, and it was not always.** Until `documentDelegatesTo`
- * walked `docMemberCapabilities`, it consulted a document's own delegations
- * only, so an identity absent from that list graded `unknown` rather than
- * `insufficient` — absence from a direct-member list is not evidence, because
- * the identity might hold access through a nested group. The commonest forgery,
- * pointing somebody's entry at a document they have nothing to do with, landed
- * on `unknown`, and this verdict was decorative.
+ * `impostor` depends on `documentDelegatesTo` walking transitively. A held
+ * document that reaches the identity by **no path** is positive evidence of
+ * non-membership; absence from a *direct*-member list alone would not be,
+ * since the identity might hold access through a nested group.
  *
- * With a transitive walk that changed. A held document that reaches the
- * identity by **no path** is positive evidence of non-membership, so the
- * forgery now convicts. Measured before and after: the same planted pointer
- * graded `unknown`, then `impostor`.
+ * The distinction has teeth: `useVerifiedProfiles` drops an entry it convicts,
+ * where an unproven one merely fails to be upgraded. A forged pointer
+ * disappears rather than degrading to its phonebook name.
  *
- * The consequence is not cosmetic. `useVerifiedProfiles` *drops* an entry it
- * convicts, where an unproven one merely fails to be upgraded — so a forged
- * pointer went from degrading to its phonebook name to disappearing. Stricter,
- * and only honest because the evidence genuinely got stronger.
- *
- * `unknown` still means what it says: the document is not here to ask.
+ * `unknown` means what it says: the document is not here to ask.
  */
 export async function verifyProfile(
   repo: Repo,

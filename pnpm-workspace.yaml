@@ -6,7 +6,7 @@ catalog:
   "@automerge/automerge-subduction": 0.16.1
   "@automerge/keyhive-react": 0.1.0-alpha.3
   "@automerge/react": 2.6.0-subduction.48
-  "@inkandswitch/onomancy": 0.1.0
+  "@inkandswitch/onomancy": 0.2.0
   "@keyhive/keyhive": 0.1.0-alpha.8
 
 # Transitive copies of the WASM-backed packages, pulled in by
@@ -16,35 +16,20 @@ catalog:
 overrides:
   "@automerge/automerge-repo": "catalog:"
   "@automerge/automerge-subduction": "catalog:"
-  # TEMPORARY, and both of these break reproducibility. They point at sibling
-  # working trees so this demo builds against unreleased library and Wasm work
-  # rather than the published packages.
   #
-  # Previously these were checksummed tarballs handed over through
-  # ~/.pi/bridge, because each agent sandbox bind-mounted only its own project
-  # directory and the repositories could not see each other. That is no longer
-  # true: /home/expede/Documents/Soft is now mounted whole, so a plain `link:`
-  # resolves. The tarballs remain on the bridge as a fallback.
+  # TEMPORARY. A link is a live view of a tree that can move without warning,
+  # so this breaks reproducibility: `pnpm install --frozen-lockfile` cannot
+  # work on a machine without the sibling checkout, which is why
+  # .github/workflows/deploy.yml and the flake.s `ci` are broken.
   #
-  # The trade is deliberate. A tarball is a fixed artifact, verifiable by
-  # checksum; a link is a live view of a tree that can move without warning.
-  # We take the link because the two libraries are being changed *for* this
-  # demo right now, and a snapshot per change costs a verification round each
-  # time. It is only sound while the other sessions announce their edits.
+  # It is here because keyhive-react is being changed *for* this demo, and a
+  # published snapshot per change would cost a verification round each time.
+  # Sound only while the changes are announced. Run `pnpm check:linked` before
+  # trusting any result against it: a link stays live-looking while the built
+  # artifact drifts behind the source.
   #
-  # keyhive-react: the DNS-name vocabulary work — DnsNameStatus split, chain
-  # freshness, contested bindings. Predates any published version.
+  # Revert to `catalog:` once a version is published.
   "@automerge/keyhive-react": "link:../keyhive-react"
-  # onomancy: needed for the status split to be *reachable*, not merely to
-  # avoid a crash. The library probes structurally for optional Wasm fields, so
-  # the published 0.1.0 degrades safely — but without `reason` on the Wasm side
-  # every unbound name reports `offline`, and `no-claim`, `malformed` and
-  # `chain-failed` can never occur.
-  "@inkandswitch/onomancy": "link:../onomancy/onomancy_wasm"
-  #
-  # REVERT both to `catalog:` once real versions are published. Until then
-  # `pnpm install --frozen-lockfile` cannot work on a machine without these
-  # trees, so .github/workflows/deploy.yml and the flake's `ci` are broken.
 
 onlyBuiltDependencies:
   - esbuild

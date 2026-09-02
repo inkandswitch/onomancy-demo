@@ -7,8 +7,8 @@
 // applying the same check on the way out, would find a valid-looking
 // certificate in a document that never accepted the name.
 //
-// This regressed once already, in the read path, and was found by planting a
-// certificate by hand. Encoding it here means the next regression is loud.
+// This has regressed once, in the read path. Encoding it here makes the next
+// one loud.
 //
 //   node e2e/certificate-install.mjs
 //

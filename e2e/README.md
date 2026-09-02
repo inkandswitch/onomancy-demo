@@ -18,8 +18,7 @@ these assert _what must stay true_.
 **`certificate-install.mjs`** — a certificate valid for document A must not be
 installable into document B. `verifyCertificate` takes bytes and a hostname, so
 it cannot know where they are being filed; without the check, a valid-looking
-certificate could sit in a document that never accepted the name. This regressed
-once already in the read path.
+certificate could sit in a document that never accepted the name.
 
 **`profile-verification.mjs`** — a profile pointer must not let one identity
 speak as another. Display names are self-asserted and forgeable; what makes the

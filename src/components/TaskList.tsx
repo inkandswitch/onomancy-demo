@@ -26,18 +26,16 @@ function sameAccess(a: Access | undefined, b: Access | undefined): boolean {
 /**
  * This identity's effective access to a document, by whichever route grants it.
  *
- * ## This was a union, and the reason it was a union was false
+ * ## One query, not a union
  *
- * It previously took the better of `bestAccessForDoc` and
- * `listMembers().find(isSelf)`, on the stated grounds that the first was
- * group-blind. **It is not.** `bestAccessForDoc` calls `transitive_members()`
- * and covers all three axes: direct membership, group-mediated membership, and
- * the document's public access.
+ * `bestAccessForDoc` calls `transitive_members()` and covers all three axes:
+ * direct membership, group-mediated membership, and the document's public
+ * access. Nothing needs to be unioned with it.
  *
- * The false belief came from two agreeing signals, both readable and both
- * wrong: `accessForDoc` is documented as "`id`'s **direct** access" while its
- * implementation is transitive, and `bestAccessForDoc`'s own local variable is
- * named `direct` while holding a transitive lookup. Documentation that is
+ * Do not trust the naming here. `accessForDoc` is documented as "`id`'s
+ * **direct** access" while its implementation is transitive, and
+ * `bestAccessForDoc`'s own local variable is named `direct` while holding a
+ * transitive lookup. Documentation that is
  * confidently wrong is worse than none, because there is nothing to prompt a
  * reader to check.
  *
@@ -68,13 +66,9 @@ async function effectiveAccess(
   // membership, group-mediated membership, and the document's public access —
   // so nothing needs to be unioned with it.
   //
-  // This used to take the better of it and `listMembers().find(isSelf)`, on the
-  // belief that the first was group-blind and the two had complementary blind
-  // spots. That belief came from a doc comment, and the doc comment is wrong:
-  // `accessForDoc` is documented as "`id`'s **direct** access" and its
-  // implementation calls `transitive_members()`, as does `bestAccessForDoc` —
-  // whose own local variable is named `direct` while holding a transitive
-  // lookup. Two readable signals, both agreeing, both false.
+  // The naming misleads: `accessForDoc` is documented as "`id`'s **direct**
+  // access" yet calls `transitive_members()`, and `bestAccessForDoc`'s own
+  // local variable is named `direct` while holding a transitive lookup.
   //
   // Measured here rather than taken on report: an identity reaching a document
   // *only* through a group, never a direct member, reads `Admin` from both
@@ -105,9 +99,9 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
   const [access, setAccess] = useState<Access | undefined>(undefined);
   const [accessChecked, setAccessChecked] = useState(false);
   // "We could not ask" is not "the answer is no". Tracked separately so the
-  // two are never rendered as the same sentence: a thrown access check used to
-  // land in `access === undefined` and print a flat denial, which is a claim
-  // the app had not earned.
+  // two are never rendered as the same sentence. A thrown access check must
+  // not land in `access === undefined` and print a flat denial, which is a
+  // claim the app has not earned.
   const [checkFailed, setCheckFailed] = useState(false);
   // Keyhive has no state for this document at all 2014 a different thing from
   // being denied, and the only one of the two with no remedy.
@@ -221,7 +215,7 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
     );
   }
 
-  // Three different unhappy states used to print one sentence. They are not
+  // Three different unhappy states, deliberately worded apart. They are not
   // the same claim, and only the first is about permission at all.
   const unavailable = checkFailed
     ? "Could not check your access to this document. That is not a refusal: the" +

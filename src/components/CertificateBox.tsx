@@ -170,15 +170,12 @@ export function CertificateBox({
       )}
       {busy && <p className="hint">Working&hellip;</p>}
 
-      {mint?.status === "unavailable" && (
-        <p className="warning">
-          {mint.reason}
-          <br />
-          <span className="detail">{mint.detail}</span>
-        </p>
-      )}
       {mint?.status === "failed" && (
-        <p className="warning">Could not create a certificate: {mint.reason}</p>
+        <p className="warning">
+          Could not create a certificate.
+          <br />
+          <span className="detail">{mint.reason}</span>
+        </p>
       )}
 
       {result?.status === "installed" && (

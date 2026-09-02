@@ -142,10 +142,6 @@ export async function verifyDocumentClaim(
       // be gossiped — obtaining a valid one is not an attack, it is the design.
       // So without this check, planting a borrowed certificate in a document
       // you control earns that document a mutual binding it never had.
-      //
-      // Measured before fixing: a certificate whose `root_doc` was document A,
-      // written into document B, returned accepted / on-path / mutual when
-      // read from B.
       if (!sameDocument(verdict.document, url)) {
         log.debug(
           `onomancy: ${url} holds a certificate for ${verdict.document} — ` +
@@ -267,9 +263,9 @@ export function useDocumentClaim(
  *
  * Absence maps to `unknown` rather than `excludes` deliberately. A document
  * that carries no certificate has not *denied* the domain; it has said
- * nothing, and the day's rule holds — absence of evidence is not evidence of
- * absence. A certificate that arrived and failed verification is different in
- * kind, and that one does convict.
+ * nothing, and absence of evidence is not evidence of absence. A certificate
+ * that arrived and failed verification is different in kind, and that one does
+ * convict.
  *
  * ## Consequence: the "solo case" stops verifying, and should
  *
