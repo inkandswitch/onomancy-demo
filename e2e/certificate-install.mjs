@@ -51,7 +51,8 @@ const results = await probe("cert-install", async () => {
   );
 
   await installCertificate(window.repo, DOC, HOST, bytes);
-  const held = (await window.repo.find(DOC)).doc()?.onomancy?.[
+  // The flat layout: the list is a top-level key of the bound document.
+  const held = (await window.repo.find(DOC)).doc()?.[
     ".well-known/onomancy/certificates"
   ];
   out.storedAfterReinstall = held?.length;

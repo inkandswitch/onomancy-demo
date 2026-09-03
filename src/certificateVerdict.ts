@@ -27,7 +27,15 @@ export type CertificateVerdict =
   /** The document carries no certificate for this hostname. Not a failure. */
   | { status: "absent" }
   /** Evidence arrived and failed. A security signal. */
-  | { status: "rejected"; reason: string };
+  | { status: "rejected"; reason: string }
+  /**
+   * The document itself has not synced to this device, so nothing it may
+   * carry could be checked. Says nothing in either direction — the remedy
+   * is to wait (or ask for access), never to read it as the document
+   * declining the name. Distinct from `absent`, where the document IS here
+   * and carries no certificate.
+   */
+  | { status: "unsynced" };
 
 /**
  * Whether a verdict is strong enough to call the binding mutual.

@@ -26,7 +26,7 @@
     "@automerge/automerge-repo-storage-indexeddb": "catalog:",
     "@automerge/automerge-subduction": "catalog:",
     "@automerge/react": "catalog:",
-    "@inkandswitch/onomancy": "link:../onomancy/onomancy_wasm",
+    "@inkandswitch/onomancy": "catalog:",
     "@inkandswitch/onomancy-react": "catalog:",
     "@keyhive/keyhive": "catalog:",
     "react": "^18.3.1",

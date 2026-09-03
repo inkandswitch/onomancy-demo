@@ -16,16 +16,13 @@
 // namestore reachable to someone you have not handed bytes to.
 
 import {
+  ImmutableString,
   interpretAsDocumentId,
   isValidAutomergeUrl,
   type AutomergeUrl,
   type Repo,
 } from "@automerge/react/slim";
-import {
-  CERTIFICATES_KEY,
-  RESERVED_ONOMANCY_KEY,
-  type NamestoreDoc,
-} from "./namestore";
+import { CERTIFICATES_KEY, type NamestoreDoc } from "./namestore";
 import { log } from "./log";
 
 /**
@@ -93,22 +90,17 @@ export async function buildBoundNamestore(
 
   const handle = await repo.find<NamestoreDoc>(url);
   handle.change((doc) => {
-    // Assign then re-read. `(doc[K] ??= {})` evaluates to the plain object
-    // assigned, not the proxy Automerge installs, so writes through it vanish
-    // silently. Only reachable when the key is genuinely absent, which is
-    // exactly the case for an imported document.
-    if (!doc[RESERVED_ONOMANCY_KEY]) doc[RESERVED_ONOMANCY_KEY] = {};
-    const map = doc[RESERVED_ONOMANCY_KEY];
-    if (!map) return;
-    // A list, so not a reference: absent from name matching by value shape
-    // (E8), never by its key. See the note in `edgesOf`.
-    (map as Record<string, unknown>)[CERTIFICATES_KEY] = [spec.certificate];
+    // The flat layout: the document's own top-level map. The certificate is
+    // a list, so it is not a reference and stays absent from name matching
+    // by value shape (E8), never by its key; edges are scalar strings
+    // because a conforming reader matches nothing else.
+    doc[CERTIFICATES_KEY] = [spec.certificate];
     for (const [path, target] of Object.entries(spec.edges)) {
-      map[path] = target as AutomergeUrl;
+      doc[path] = new ImmutableString(target);
     }
   });
 
-  const written = handle.doc()?.[RESERVED_ONOMANCY_KEY] ?? {};
+  const written = handle.doc() ?? {};
   const edges = Object.keys(written).filter((key) => key !== CERTIFICATES_KEY);
   if (edges.length !== Object.keys(spec.edges).length) {
     // The silent-write failure has a symptom now rather than a shrug.
@@ -169,7 +161,7 @@ export async function importBoundNamestore(
   const url = String(document) as AutomergeUrl;
   repo.import(bytes, { docId: interpretAsDocumentId(url) });
   const handle = await repo.find<NamestoreDoc>(url);
-  const map = handle.doc()?.[RESERVED_ONOMANCY_KEY] ?? {};
+  const map = handle.doc() ?? {};
   const held = (map as Record<string, unknown>)[CERTIFICATES_KEY];
   return {
     document: url,

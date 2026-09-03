@@ -38,3 +38,24 @@ describe("the .well-known/ reserved-path guard", () => {
     expect(() => refuseReservedPath("todos/.well-known")).not.toThrow();
   });
 });
+
+describe("the app-data guard", () => {
+  // Under the flat layout the petname map and the self-profile pointer share
+  // the top-level map with the names, so a bind at their keys would replace
+  // application data with a document reference — the `.well-known/` clobber
+  // one layer closer to home. These keys predate the layout; new app data
+  // must claim a `.well-known/<owner>/` segment instead.
+  it("refuses the app's own data keys", () => {
+    expect(() => refuseReservedPath("petnames")).toThrow(ReservedPathError);
+    expect(() => refuseReservedPath("profile")).toThrow(ReservedPathError);
+    expect(() => refuseReservedPath("petnames/anything")).toThrow(
+      ReservedPathError
+    );
+  });
+
+  it("passes names that merely start with the same letters", () => {
+    expect(() => refuseReservedPath("petnames-of-pets")).not.toThrow();
+    expect(() => refuseReservedPath("profiles")).not.toThrow();
+    expect(() => refuseReservedPath("todos/petnames")).not.toThrow();
+  });
+});

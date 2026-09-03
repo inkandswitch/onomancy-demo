@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
 import { isValidAutomergeUrl } from "@automerge/react/slim";
 import type { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
-import { documentDelegatesTo } from "@inkandswitch/onomancy-react";
+import { bareId, documentDelegatesTo } from "@inkandswitch/onomancy-react";
 import type {
   DirectoryEntry,
   NameDirectory,
@@ -50,10 +50,6 @@ type ProfileDoc = NamestoreDoc & { [PROFILE_KEY]?: SelfProfile };
  * verdict is `unknown`. Matches the namestore walk's hop timeout.
  */
 const PROFILE_TIMEOUT_MS = 10_000;
-
-function bareId(id: string): string {
-  return (id.startsWith("0x") ? id.slice(2) : id).toLowerCase();
-}
 
 /** Publish your own name and avatar into your own namestore. */
 export async function publishProfile(

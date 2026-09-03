@@ -12,7 +12,11 @@ import { useEffect, useState } from "react";
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
 import { verifyCertificate } from "@inkandswitch/onomancy";
 import type { Verdict } from "@inkandswitch/onomancy";
-import type { DnsDesignation } from "@inkandswitch/onomancy-react/onomancy";
+import type {
+  DnsDesignation,
+  ReverseBindingCheck,
+} from "@inkandswitch/onomancy-react/onomancy";
+import { requireReverseBinding as composeReverseBinding } from "@inkandswitch/onomancy-react/onomancy";
 import {
   CERTIFICATES_KEY,
   RESERVED_ONOMANCY_KEY,
@@ -82,6 +86,9 @@ export async function verifyDocumentClaim(
   hostname: string
 ): Promise<CertificateVerdict> {
   const held = await certificatesOf(repo, url);
+  // No replica arrived: nothing the document may carry could be checked, and
+  // "makes no claim" would be a statement about a document never seen.
+  if (held === undefined) return { status: "unsynced" };
   if (held.length === 0) return { status: "absent" };
 
   let rejection: string | null = null;
@@ -142,6 +149,8 @@ export function describeClaim(
       return `Resolved through DNS. This document makes no claim on ${hostname}, so nothing here shows it accepts the name.`;
     case "rejected":
       return `Resolved through DNS, but this document's certificate for ${hostname} failed verification (${verdict.reason}). Evidence arrived and did not hold.`;
+    case "unsynced":
+      return `Resolved through DNS, but the document ${hostname} designates has not synced to this device, so whether it accepts the name cannot be checked yet. A statement about replication, not about the name.`;
   }
 }
 
@@ -231,27 +240,22 @@ export function requireReverseBinding(
   repo: Repo,
   inner: DnsDesignation
 ): DnsDesignation {
-  return async (entry, boundIds, hostname) => {
-    const forward = await inner(entry, boundIds, hostname);
-    if (forward !== "designates") return forward;
-
-    // Every document the domain designates gets a chance: a domain mid-
-    // migration publishes several, and only one need carry the certificate.
-    let sawRejection = false;
-    for (const id of boundIds) {
-      const url = documentUrlFromHex(id);
-      if (!url) continue;
-      const claim = await verifyDocumentClaim(repo, url, hostname);
-      if (claim.status === "accepted" && isMutual(claim)) return "designates";
-      if (claim.status === "rejected") sawRejection = true;
-    }
-
-    log.debug(
-      `onomancy: ${hostname} designates a document ${entry.id.slice(0, 8)} ` +
-        `administers, but no certificate ${sawRejection ? "verified" : "was held"}`
-    );
-    return sawRejection ? "excludes" : "unknown";
+  // The decision table (accepted → designates, absent → unknown, rejected →
+  // excludes) lives in the library combinator now; what stays here is this
+  // app's answer to "what did the document say" — held certificates through
+  // the mutuality rule. `unsynced` and a non-mutual acceptance both map to
+  // `absent`: neither is evidence, and the combinator grades no-evidence as
+  // `unknown`.
+  const check: ReverseBindingCheck = async (id, hostname) => {
+    const url = documentUrlFromHex(id);
+    if (!url) return "absent";
+    const claim = await verifyDocumentClaim(repo, url, hostname);
+    if (claim.status === "accepted" && isMutual(claim)) return "accepted";
+    if (claim.status === "rejected") return "rejected";
+    return "absent";
   };
+
+  return composeReverseBinding(check, inner);
 }
 
 /** What happened when a certificate was offered to a document. */
@@ -309,14 +313,17 @@ export async function installCertificate(
   let replaced = false;
   const handle = await repo.find<NamestoreDoc>(url);
   handle.change((doc) => {
-    // Assign then re-read: `??=` yields the plain object, not the proxy.
-    if (!doc[RESERVED_ONOMANCY_KEY]) doc[RESERVED_ONOMANCY_KEY] = {};
-    const map = doc[RESERVED_ONOMANCY_KEY] as Record<string, unknown>;
-    if (!map) return;
-
-    const held = Array.isArray(map[CERTIFICATES_KEY])
-      ? (map[CERTIFICATES_KEY] as Uint8Array[])
-      : [];
+    // The normative location: a top-level key of the bound document. An
+    // install is a write path, so it also lifts any list still sitting in
+    // the legacy nested container — installing is exactly the moment the
+    // holder cares that verifiers can find what was installed.
+    const legacy = doc[RESERVED_ONOMANCY_KEY] as
+      Record<string, unknown> | undefined;
+    const held = Array.isArray(doc[CERTIFICATES_KEY])
+      ? (doc[CERTIFICATES_KEY] as Uint8Array[])
+      : legacy && Array.isArray(legacy[CERTIFICATES_KEY])
+        ? (legacy[CERTIFICATES_KEY] as Uint8Array[])
+        : [];
 
     const kept = held.filter((entry) => {
       if (!(entry instanceof Uint8Array)) return false;
@@ -334,7 +341,8 @@ export async function installCertificate(
       return true;
     });
 
-    map[CERTIFICATES_KEY] = [...kept, bytes];
+    doc[CERTIFICATES_KEY] = [...kept, bytes];
+    if (legacy && CERTIFICATES_KEY in legacy) delete legacy[CERTIFICATES_KEY];
   });
 
   log.info(

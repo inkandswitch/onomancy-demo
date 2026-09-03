@@ -18,6 +18,7 @@
 // and authoritative, the second is an assertion others must be able to reach.
 
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
+import { bareId } from "@inkandswitch/onomancy-react";
 import type {
   DirectoryEntry,
   NameDirectory,
@@ -44,10 +45,6 @@ export interface Petname {
 export type PetnameMap = Record<string, Petname>;
 
 type PetnameDoc = NamestoreDoc & { [PETNAMES_KEY]?: PetnameMap };
-
-function bareId(id: string): string {
-  return (id.startsWith("0x") ? id.slice(2) : id).toLowerCase();
-}
 
 /** Write a label for `id` into this identity's own namestore. */
 export async function setPetname(

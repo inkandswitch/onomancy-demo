@@ -13,12 +13,13 @@
 // documents. It cannot — that is the whole finding.
 
 import {
+  ImmutableString,
   interpretAsDocumentId,
   isValidAutomergeUrl,
   type AutomergeUrl,
   type Repo,
 } from "@automerge/react/slim";
-import { RESERVED_ONOMANCY_KEY, CERTIFICATES_KEY } from "./namestore";
+import { CERTIFICATES_KEY } from "./namestore";
 import type { NamestoreDoc } from "./namestore";
 import { log } from "./log";
 
@@ -88,19 +89,15 @@ export async function seedOnotest(
 
   const handle = await repo.find<NamestoreDoc>(ONOTEST_DOC);
   handle.change((doc) => {
-    // Assign then re-read — see the note in `bindEdge`. `??=` returns the
-    // plain object, not the proxy, and this document is *imported* rather than
-    // created, so the reserved key is genuinely absent the first time.
-    if (!doc[RESERVED_ONOMANCY_KEY]) doc[RESERVED_ONOMANCY_KEY] = {};
-    const map = doc[RESERVED_ONOMANCY_KEY];
-    if (!map) return;
-    // The certificate is a list, so it is not a reference and the walk skips
-    // it by value shape (E8). Nothing about its key name matters.
-    (map as Record<string, unknown>)[CERTIFICATES_KEY] = [certificate];
-    map["todos/test"] = target as AutomergeUrl;
+    // The flat layout: names are bare top-level keys, protocol data sits
+    // beside them. The certificate is a list, so it is not a reference and
+    // the walk skips it by value shape (E8); the edge is a scalar string
+    // because a conforming reader matches nothing else.
+    doc[CERTIFICATES_KEY] = [certificate];
+    doc["todos/test"] = new ImmutableString(target);
   });
 
-  const seeded = handle.doc()?.[RESERVED_ONOMANCY_KEY] ?? {};
+  const seeded = handle.doc() ?? {};
   const result: SeedResult = {
     document: ONOTEST_DOC,
     certificateBytes: certificate.length,

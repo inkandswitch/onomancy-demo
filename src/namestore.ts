@@ -16,7 +16,17 @@
 // document, so whoever holds admin on it speaks for the domain. Ownership is
 // shared by inviting more admins rather than by editing DNS.
 
-import { AutomergeUrl, Repo, isValidAutomergeUrl } from "@automerge/react/slim";
+import {
+  AutomergeUrl,
+  ImmutableString,
+  Repo,
+  isImmutableString,
+  isValidAutomergeUrl,
+} from "@automerge/react/slim";
+import {
+  bindEdge as writeEdge,
+  unbindEdge as removeEdge,
+} from "@inkandswitch/onomancy-react";
 import {
   AutomergeRepoKeyhive,
   uint8ArrayToHex,
@@ -27,19 +37,29 @@ import { errorMessage, log } from "./log";
 import type { NamestoreEdges } from "./walk";
 
 /**
- * The reserved top-level key namestore edges live under.
+ * The top-level key the PRE-MIGRATION layout nested edges under.
  *
- * Reserving one key lets a namestore share a document with other data without
- * colliding, which is what makes "the document a domain binds" and "the
- * document names live in" able to be the same document.
+ * The path-resolution spec's namestore is the document's own top-level map —
+ * flat, with multi-segment keys — not a container inside it. Both this app
+ * and onomancy-react's test app shipped the nested layout before reading
+ * that sentence carefully, mutually consistent and jointly nonconformant, so
+ * the flip is coordinated: writes go flat, reads take both branches, and
+ * this key survives only as the legacy branch's address. It goes away when
+ * no namestore in use still holds a nested edge.
  */
 export const RESERVED_ONOMANCY_KEY = "onomancy";
 
 export type { NamestoreEdges } from "./walk";
 
+/**
+ * A namestore document: names are bare top-level keys whose values are
+ * document references, sharing the map with protocol and application data
+ * (which hold non-reference values and are therefore absent from matching).
+ */
 export type NamestoreDoc = {
+  /** The legacy nested map, read during the migration window only. */
   [RESERVED_ONOMANCY_KEY]?: NamestoreEdges;
-};
+} & Record<string, unknown>;
 
 /**
  * The serial last published for a given record body.
@@ -148,8 +168,10 @@ export interface Namestore {
  *
  * Created with `repo.create2` so it is a keyhive document like the task lists,
  * and granted sync server relay access so it reaches other devices. It is
- * seeded with the reserved map rather than left empty because a document with
- * no content never reaches the ready state in the current stack.
+ * seeded with an empty certificate list rather than left empty because a
+ * document with no content never reaches the ready state in the current
+ * stack — and the list is the one entry every namestore eventually wants:
+ * a non-reference value at the protocol's own key, absent from matching.
  */
 export function useNamestore(
   repo: Repo,
@@ -173,7 +195,7 @@ export function useNamestore(
     void (async () => {
       try {
         const handle = await repo.create2<NamestoreDoc>({
-          [RESERVED_ONOMANCY_KEY]: {},
+          [CERTIFICATES_KEY]: [],
         });
         // Relay access so the sync server can move its ciphertext, exactly as
         // a new task list gets in DocumentList.
@@ -288,13 +310,12 @@ export async function edgesOf(
   }
   if (typeof doc !== "object" || doc === null) return undefined;
 
-  const map = (doc as Record<string, unknown>)[RESERVED_ONOMANCY_KEY];
-  if (typeof map !== "object" || map === null) return {};
-
-  // Bare document references only. Anything else is absent rather than an
-  // error, so one malformed edge cannot deny the rest of the namestore.
-  // E8, per the path-resolution spec: a value that is not a reference is
-  // absent from matching. The exclusion is **by value shape, never by key**.
+  // The document's own top-level map IS the namestore (path-resolution spec,
+  // Namestore Layout): flat, multi-segment keys, shared with protocol and
+  // application data. Bare document references only — anything else is
+  // absent rather than an error, so one malformed edge cannot deny the rest.
+  // E8: a value that is not a reference is absent from matching, and the
+  // exclusion is **by value shape, never by key**.
   //
   // That distinction is load-bearing and easy to get backwards. Protocol data
   // lives under a `.well-known/` prefix by convention, so skipping that prefix
@@ -302,35 +323,82 @@ export async function edgesOf(
   // resolvers apply no special rule to the prefix, and "an entry under the
   // prefix whose value *is* a reference resolves like any other". Keying the
   // exclusion on the prefix would both under-exclude (non-reference values
-  // elsewhere) and over-exclude (legitimate references under it).
-  //
-  // So the certificate list at `.well-known/onomancy/certificates` is skipped
-  // here for one reason only: a list is not a reference. Nothing about its
-  // name matters.
+  // elsewhere) and over-exclude (legitimate references under it). The
+  // certificate list, the petname map, and the legacy nested container are
+  // all skipped here for one reason only: none of them is a reference.
   const edges: NamestoreEdges = {};
-  const malformed: string[] = [];
-  for (const [path, target] of Object.entries(map)) {
-    if (typeof target === "string" && isValidAutomergeUrl(target)) {
+  const skipped: string[] = [];
+  for (const [path, value] of Object.entries(doc)) {
+    const target = edgeUrlOf(value);
+    if (target !== undefined) {
       edges[path] = target;
     } else {
-      malformed.push(path);
+      skipped.push(path);
+    }
+  }
+
+  // The legacy nested layout, read as a fallback during the migration
+  // window: a flat edge wins over a nested one at the same path, rebinding
+  // migrates a path for free, and `migrateNamestore` closes the rest. This
+  // branch's removal condition: no namestore in use still holds a nested
+  // edge — the log below is how such documents stay visible.
+  const legacy = (doc as NamestoreDoc)[RESERVED_ONOMANCY_KEY];
+  if (typeof legacy === "object" && legacy !== null) {
+    const inherited: string[] = [];
+    for (const [path, value] of Object.entries(legacy)) {
+      const target = edgeUrlOf(value);
+      if (target !== undefined && !(path in edges)) {
+        edges[path] = target;
+        inherited.push(path);
+      }
+    }
+    if (inherited.length > 0) {
+      log.warn(
+        `onomancy: ${url} still resolves ${inherited.length} edge(s) from the ` +
+          `legacy nested layout (${inherited.join(", ")}); rebind them or run ` +
+          `the namestore migration — conforming resolvers cannot see them`
+      );
     }
   }
 
   // E8's SHOULD: surface what was ignored. Silent exclusion is how a mistyped
   // reference becomes an unbound name with no way to tell the two apart.
-  if (malformed.length > 0) {
+  if (skipped.length > 0) {
     log.debug(
-      `onomancy: ${url} has ${malformed.length} non-reference entr${
-        malformed.length === 1 ? "y" : "ies"
-      } (absent from matching): ${malformed.join(", ")}`
+      `onomancy: ${url} has ${skipped.length} non-reference entr${
+        skipped.length === 1 ? "y" : "ies"
+      } (absent from matching): ${skipped.join(", ")}`
     );
   }
   return edges;
 }
 
 /**
- * The reserved location protocol data lives at, by writers' convention.
+ * The reference a namestore value carries, or `undefined` when the value is
+ * not a reference (E8).
+ *
+ * Two encodings are accepted, deliberately. A scalar string — written as
+ * `ImmutableString`, the only encoding a conforming reader matches — and a
+ * plain JS string, which this app's own pre-migration writes produced
+ * (assignment turns those into Automerge `Text`, which conforming readers
+ * refuse because spliced merges can form a third value nobody wrote). The
+ * `Text` branch is a KNOWING leniency bounded by behaviour rather than
+ * structure: neither app splices edge values. It keeps old edges resolving
+ * through the migration window and shares the legacy branch's removal
+ * condition.
+ */
+function edgeUrlOf(value: unknown): AutomergeUrl | undefined {
+  const text = isImmutableString(value)
+    ? value.val
+    : typeof value === "string"
+      ? value
+      : undefined;
+  return text !== undefined && isValidAutomergeUrl(text) ? text : undefined;
+}
+
+/**
+ * The reserved location protocol data lives at, by writers' convention:
+ * a top-level key of the bound document, beside its names.
  *
  * Resolution attaches no meaning to this string — see the E8 note in
  * {@link edgesOf}. It is used only when *reading* certificates, which is a
@@ -339,21 +407,25 @@ export async function edgesOf(
 export const CERTIFICATES_KEY = ".well-known/onomancy/certificates";
 
 /**
- * The onomancy certificates a document carries, as raw `ONC\0` bytes.
+ * The onomancy certificates a document carries, as raw `ONC\0` bytes —
+ * or `undefined` when this device does not hold the document.
+ *
+ * The distinction is the same one `edgesOf` draws, and it is load-bearing:
+ * an empty list is the document SAYING nothing (it is here, and it carries
+ * no certificate), while `undefined` is the absence of the document itself
+ * (no replica arrived in the time allowed, or the read was refused).
+ * Collapsing them turns "cannot check yet" into "this document makes no
+ * claim" — a positive statement about a document this device has never
+ * seen.
  *
  * A document naming several hostnames carries several certificates, so this
- * returns all of them and leaves selection to the verifier: the ones for other
- * names are not failures, they are simply not this hostname's.
- *
- * Returns an empty list both when the document holds none and when it holds
- * something unreadable there. That is deliberate — "no certificate held" is an
- * absence rather than a security signal, and the two must not be conflated
- * with a chain that arrived and failed.
+ * returns all of them and leaves selection to the verifier: the ones for
+ * other names are not failures, they are simply not this hostname's.
  */
 export async function certificatesOf(
   repo: Repo,
   url: AutomergeUrl
-): Promise<Uint8Array[]> {
+): Promise<Uint8Array[] | undefined> {
   let doc: unknown;
   const abort = new AbortController();
   const giveUp = setTimeout(
@@ -365,17 +437,34 @@ export async function certificatesOf(
     doc = handle.doc();
   } catch (error) {
     log.debug(`onomancy: could not read certificates from ${url}:`, error);
-    return [];
+    return undefined;
   } finally {
     clearTimeout(giveUp);
   }
 
-  if (typeof doc !== "object" || doc === null) return [];
-  const map = (doc as Record<string, unknown>)[RESERVED_ONOMANCY_KEY];
-  if (typeof map !== "object" || map === null) return [];
+  if (typeof doc !== "object" || doc === null) return undefined;
 
-  const held = (map as Record<string, unknown>)[CERTIFICATES_KEY];
-  if (!Array.isArray(held)) return [];
+  // The normative location: a top-level key of the bound document. The
+  // legacy nested location is read as a fallback with the same removal
+  // condition as the legacy edges — see `edgesOf`.
+  const flat = (doc as Record<string, unknown>)[CERTIFICATES_KEY];
+  let held: unknown[];
+  if (Array.isArray(flat)) {
+    held = flat;
+  } else {
+    const legacy = (doc as NamestoreDoc)[RESERVED_ONOMANCY_KEY];
+    const nested =
+      typeof legacy === "object" && legacy !== null
+        ? (legacy as Record<string, unknown>)[CERTIFICATES_KEY]
+        : undefined;
+    if (!Array.isArray(nested)) return [];
+    log.warn(
+      `onomancy: ${url} carries its certificate list in the legacy nested ` +
+        `location; run the namestore migration — conforming verifiers cannot ` +
+        `see it there`
+    );
+    held = nested;
+  }
 
   return held.flatMap((entry) => (entry instanceof Uint8Array ? [entry] : []));
 }
@@ -407,30 +496,34 @@ export async function bindEdge(
 
   const handle = await repo.find<NamestoreDoc>(namestoreUrl);
   handle.change((doc) => {
-    // Assign, then re-read. `(doc[K] ??= {})` evaluates to the plain object
-    // that was assigned, NOT to the proxy Automerge installs in its place — so
-    // writes through it land on a detached object and vanish, with no error.
-    //
-    // This has always worked here only because a namestore is created with the
-    // reserved key already present, which makes `??=` short-circuit and return
-    // the live proxy. It silently no-ops the first time the key is absent,
-    // which is exactly what happened when a document was imported rather than
-    // created (see devFixtures.ts).
-    if (!doc[RESERVED_ONOMANCY_KEY]) doc[RESERVED_ONOMANCY_KEY] = {};
-    const edges = doc[RESERVED_ONOMANCY_KEY];
-    if (edges) edges[path] = target;
+    // The layout rules live in the library helper — the flat top-level
+    // write and the legacy-container cleanup — so they cannot drift between
+    // consumers. The scalar-string encoding is ours to inject because it is
+    // the substrate's: a plain JS string assigned into an Automerge map
+    // becomes `Text`, which a conforming reader refuses.
+    writeEdge(doc, path, target, (url) => new ImmutableString(url));
   });
 }
 
 /** Refusal to touch a name under a protocol-reserved prefix. */
 export class ReservedPathError extends Error {
-  constructor(path: string) {
-    super(
-      `"${path}" is reserved: paths under .well-known/ belong to the protocol, not to names`
-    );
+  constructor(path: string, owner: string) {
+    super(`"${path}" is reserved: it belongs to ${owner}, not to names`);
     this.name = "ReservedPathError";
   }
 }
+
+/**
+ * The keys this app's own data lives under, in the same top-level map the
+ * names do: the petname map and the self-profile pointer (the trust
+ * ladder's upper rungs). A bind at one of these would replace the map with
+ * a document reference — the same clobber the `.well-known/` rule prevents,
+ * one layer closer to home. They predate the flat layout; new application
+ * data must claim a `.well-known/<owner>/` segment instead, because owners
+ * are asserted rather than inherited and two asserting apps collide
+ * undetectably.
+ */
+const APP_DATA_KEYS = ["petnames", "profile"];
 
 /**
  * The one gate both write paths share. Exported so it can be tested without
@@ -438,7 +531,10 @@ export class ReservedPathError extends Error {
  */
 export function refuseReservedPath(path: string): void {
   if (path === ".well-known" || path.startsWith(".well-known/")) {
-    throw new ReservedPathError(path);
+    throw new ReservedPathError(path, "the protocol (.well-known/)");
+  }
+  if (APP_DATA_KEYS.some((key) => path === key || path.startsWith(`${key}/`))) {
+    throw new ReservedPathError(path, "this app's own data");
   }
 }
 
@@ -456,7 +552,76 @@ export async function unbindEdge(
 
   const handle = await repo.find<NamestoreDoc>(namestoreUrl);
   handle.change((doc) => {
-    const edges = doc[RESERVED_ONOMANCY_KEY];
-    if (edges) delete edges[path];
+    // The library helper deletes from both layouts, so an unbind cannot
+    // resurrect a legacy edge the flat one was shadowing.
+    removeEdge(doc, path);
   });
+}
+
+/**
+ * Move a namestore's legacy nested entries to the flat layout: every nested
+ * edge to a top-level scalar (unless a flat edge already shadows it), the
+ * certificate list to its normative key, and the emptied container removed.
+ *
+ * Explicit and user-invoked, never run from a read path: migration rewrites
+ * a document other devices replicate, and a reader that "heals" what it
+ * reads turns every open tab into a writer.
+ *
+ * Returns the number of entries moved.
+ */
+export async function migrateNamestore(
+  repo: Repo,
+  namestoreUrl: AutomergeUrl
+): Promise<number> {
+  const handle = await repo.find<NamestoreDoc>(namestoreUrl);
+  let moved = 0;
+  handle.change((doc) => {
+    const legacy = doc[RESERVED_ONOMANCY_KEY];
+    if (typeof legacy !== "object" || legacy === null) return;
+
+    for (const [path, value] of Object.entries(legacy)) {
+      if (path === CERTIFICATES_KEY) {
+        if (Array.isArray(value) && !(CERTIFICATES_KEY in doc)) {
+          doc[CERTIFICATES_KEY] = value.slice();
+          moved += 1;
+        }
+        delete legacy[path];
+        continue;
+      }
+
+      const target = edgeUrlOf(value);
+      if (target !== undefined) {
+        if (!(path in doc)) {
+          doc[path] = new ImmutableString(target);
+          moved += 1;
+        }
+        delete legacy[path];
+      }
+      // A nested value that is neither an edge nor the certificate list is
+      // left where it is: this migration moves what it understands and
+      // refuses to guess about the rest.
+    }
+
+    if (Object.keys(legacy).length === 0) {
+      delete doc[RESERVED_ONOMANCY_KEY];
+    }
+  });
+  return moved;
+}
+
+/**
+ * Whether a held namestore still carries legacy nested entries — the
+ * condition under which the migration affordance is worth showing.
+ */
+export async function hasLegacyEntries(
+  repo: Repo,
+  namestoreUrl: AutomergeUrl
+): Promise<boolean> {
+  const handle = await repo.find<NamestoreDoc>(namestoreUrl);
+  const legacy = handle.doc()?.[RESERVED_ONOMANCY_KEY];
+  return (
+    typeof legacy === "object" &&
+    legacy !== null &&
+    Object.keys(legacy).length > 0
+  );
 }

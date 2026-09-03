@@ -36,5 +36,6 @@ describe("isMutual", () => {
     expect(isMutual({ status: "rejected", reason: "chain-rejected" })).toBe(
       false
     );
+    expect(isMutual({ status: "unsynced" })).toBe(false);
   });
 });
