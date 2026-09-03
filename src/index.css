@@ -61,10 +61,10 @@
   }
 }
 
-#keyhive-logo {
-  height: 2em;
+#app-logo {
+  font-size: 1.5em;
+  line-height: 1;
   margin-right: 0.5em;
-  vertical-align: middle;
 }
 
 /* Certificate install form.

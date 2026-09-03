@@ -10,6 +10,8 @@ access-controlled substrate built from
 (ARK), with UI components from
 [onomancy-react](https://github.com/inkandswitch/onomancy-react).
 
+![The demo: an encrypted, shareable TODO list, openable by name (here resolved through DNS from @brooklynzelenka.com), with the certificate banner reporting what the document itself claims about the domain](docs/todo-app.png)
+
 It began as a fork of the keyhive TODO demo, and the TODO list is still the
 document being named: each list is an end-to-end encrypted Automerge document.
 The demo demonstrates:
@@ -27,6 +29,12 @@ The demo demonstrates:
 - Making a document public so anyone can read or edit it.
 - Revoking access, and access-gated UI (read-only view, hidden share button)
   driven by keyhive membership.
+
+Binding a domain to your identity is a profile field: claim the name, publish
+the TXT record the app hands you, and the claim upgrades from asserted to
+verified as the DNSSEC chain and certificate checks land.
+
+![The DNS name claim field in the profile editor: a domain that names this identity through an _onomancy DNS record, trustworthy once verified](docs/dns-name-claim.png)
 
 ## Run
 
