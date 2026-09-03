@@ -1,4 +1,3 @@
-import keyhiveLogo from "../assets/honeybee.png";
 import halAvatarUrl from "../assets/HAL-9000.webp";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import {
@@ -321,7 +320,9 @@ function AppShell({
       <div className="flex-1 flex flex-col bg-muted">
         <header className="p-6 border-b border-foreground/10 bg-muted flex justify-center relative">
           <h1 className="text-2xl font-semibold flex items-center text-foreground">
-            <img src={keyhiveLogo} alt="Honeybee logo" id="keyhive-logo" />
+            <span id="app-logo" aria-hidden="true">
+              🪄
+            </span>
             Onomancy Demo
           </h1>
           <div className="absolute right-6 top-1/2 -translate-y-1/2">
