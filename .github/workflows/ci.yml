@@ -1,0 +1,47 @@
+# Gates for branches and pull requests. deploy.yml runs only on pushes to
+# main, so without this workflow a branch gets no CI of any kind.
+#
+# Kept deliberately parallel to the flake's `ci` app (lint, test, typecheck,
+# build) — the two definitions of "CI" can drift, and until one calls the
+# other, a change to the gate list belongs in both.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: ["main"]
+
+# A branch with an open PR triggers both events per push; cancel the
+# duplicate rather than running the whole suite twice.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # Before setup-node, so its pnpm cache lookup can find the store.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Test
+        run: pnpm test
+      - name: Typecheck
+        run: pnpm typecheck
+      # A throwaway phonebook id: nothing connects to it, the point is only
+      # that the bundle compiles. Never reuse one of these for a real run.
+      - name: Build
+        run: PHONEBOOK_DOC_ID="$(pnpm -s gen:phonebook-id)" pnpm build

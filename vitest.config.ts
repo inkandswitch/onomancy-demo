@@ -8,7 +8,10 @@ import { defineConfig } from "vitest/config";
 // means `pnpm test` works on a fresh clone with no .env at all.
 export default defineConfig({
   test: {
-    include: ["src/**/*.test.ts"],
+    // `tests/` holds suites outside the app's browser-scoped tsconfig:
+    // the conformance replay reads its vendored vectors with node:fs,
+    // which `tsc --noEmit` (include: ["src"]) rightly has no types for.
+    include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
     environment: "node",
   },
 });

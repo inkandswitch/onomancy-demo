@@ -22,8 +22,8 @@ import {
   uint8ArrayToHex,
 } from "@automerge/automerge-repo-keyhive";
 import { useEffect, useState } from "react";
+import { nextSerial } from "@inkandswitch/onomancy";
 import { errorMessage, log } from "./log";
-import { nextSerial } from "./record";
 import type { NamestoreEdges } from "./walk";
 
 /**
@@ -99,7 +99,10 @@ export function serialForBody(body: string): bigint {
     return max === null || value > max ? value : max;
   }, null);
 
-  const minted = nextSerial(highest);
+  // The shared publisher rule, `max(now, last + 1)`: serials come back as
+  // decimal strings because the u64 space outruns `number`. Refuses at the
+  // ceiling rather than saturating or wrapping.
+  const minted = BigInt(nextSerial(highest?.toString()));
   try {
     localStorage.setItem(
       SERIAL_KEY,
@@ -115,6 +118,11 @@ export function serialForBody(body: string): bigint {
 }
 
 function urlKey(identityHex: string): string {
+  // The `keyhive-demo` prefix survives the fork to onomancy-demo on purpose:
+  // this key is the ONLY pointer to an existing identity's namestore, and a
+  // live DNS record may designate that document. Renaming the key orphans
+  // both. The same reasoning keeps the other persisted `keyhive-demo-*`
+  // identifiers (root-doc key, binding serial, peer id suffixes) unchanged.
   return `keyhive-demo-namestore-${identityHex}`;
 }
 
@@ -387,6 +395,16 @@ export async function bindEdge(
   path: string,
   target: AutomergeUrl
 ): Promise<void> {
+  // Onomancy owns the `.well-known/` prefix by assignment: the certificate
+  // list lives at `.well-known/onomancy/certificates` in the same map the
+  // edges do, so an ordinary bind at that path would replace the list with a
+  // document reference. The write would look like a successful bind while
+  // silently degrading every verified `@host` badge for this namestore to
+  // "makes no claim". Refusing the whole prefix, rather than the one key,
+  // matches the assigned ownership — any path under it is onomancy's to
+  // define, not ours to bind.
+  refuseReservedPath(path);
+
   const handle = await repo.find<NamestoreDoc>(namestoreUrl);
   handle.change((doc) => {
     // Assign, then re-read. `(doc[K] ??= {})` evaluates to the plain object
@@ -404,12 +422,38 @@ export async function bindEdge(
   });
 }
 
+/** Refusal to touch a name under a protocol-reserved prefix. */
+export class ReservedPathError extends Error {
+  constructor(path: string) {
+    super(
+      `"${path}" is reserved: paths under .well-known/ belong to the protocol, not to names`
+    );
+    this.name = "ReservedPathError";
+  }
+}
+
+/**
+ * The one gate both write paths share. Exported so it can be tested without
+ * a repo: it must fire before any document is touched.
+ */
+export function refuseReservedPath(path: string): void {
+  if (path === ".well-known" || path.startsWith(".well-known/")) {
+    throw new ReservedPathError(path);
+  }
+}
+
 /** Remove one edge, which is how a name is unbound. */
 export async function unbindEdge(
   repo: Repo,
   namestoreUrl: AutomergeUrl,
   path: string
 ): Promise<void> {
+  // Guarded like `bindEdge`, and for the delete direction the stakes are the
+  // same: unbinding `.well-known/onomancy/certificates` would delete the
+  // certificate list. No caller exists yet — this closes the trap before the
+  // unbind UI lands, not after.
+  refuseReservedPath(path);
+
   const handle = await repo.find<NamestoreDoc>(namestoreUrl);
   handle.change((doc) => {
     const edges = doc[RESERVED_ONOMANCY_KEY];

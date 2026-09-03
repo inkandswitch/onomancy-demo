@@ -25,8 +25,7 @@
 //
 // Exits non-zero when anything is stale, so it can gate an integration run.
 
-import { execFileSync } from "node:child_process";
-import { readdirSync, readlinkSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readlinkSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -41,15 +40,20 @@ function linkedPackages() {
   const consider = (name, path) => {
     let target;
     try {
-      if (!statSync(path, { throwIfNoEntry: false })) return;
+      // `lstatSync`, not `statSync`: stat follows the link, so a symlink
+      // whose target has vanished reads as "nothing here" and gets silently
+      // skipped — the strongest possible form of "what you read is not what
+      // executes", reported as clean. The link itself is the fact to check.
+      if (!lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink()) return;
       target = resolve(join(path, ".."), readlinkSync(path));
     } catch {
-      return; // Not a symlink, or unreadable. Neither is interesting.
+      return; // Unreadable. Not a link we can reason about.
     }
     // Links into `.pnpm/` are the store's own indirection, not a live tree.
     if (target.includes("/.pnpm/") || target.startsWith(ROOT + "/node_modules"))
       return;
-    found.push({ name, target });
+    const broken = !statSync(target, { throwIfNoEntry: false });
+    found.push({ name, target, broken });
   };
 
   for (const entry of readdirSync(MODULES)) {
@@ -64,33 +68,52 @@ function linkedPackages() {
   return found;
 }
 
-/** Newest mtime among files under `dir` with one of `extensions`. */
+/**
+ * Newest mtime among files under `dir` with one of `extensions`.
+ *
+ * Walked in Node rather than shelled out to `find -printf`, which is a GNU
+ * extension: on a BSD/macOS `find` the spawn threw, the catch swallowed it,
+ * and a missing *tool* read as "consumed from source" — a false green.
+ */
 function newestFile(dir, extensions) {
-  let out;
-  try {
-    const listed = execFileSync(
-      "find",
-      [dir, "-type", "f", "-printf", "%T@ %p\n"],
-      { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }
-    );
-    for (const line of listed.split("\n")) {
-      if (!line) continue;
-      const at = line.indexOf(" ");
-      const path = line.slice(at + 1);
-      if (!extensions.some((extension) => path.endsWith(extension))) continue;
-      const time = Number(line.slice(0, at));
-      if (!out || time > out.time) out = { time, path };
-    }
-  } catch {
+  if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory())
     return undefined; // No such directory. Reported as unknown, not as stale.
-  }
+
+  let out;
+  const walk = (at) => {
+    for (const entry of readdirSync(at, { withFileTypes: true })) {
+      const path = join(at, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+      } else if (
+        entry.isFile() &&
+        extensions.some((extension) => path.endsWith(extension))
+      ) {
+        const time = statSync(path).mtimeMs / 1000;
+        if (!out || time > out.time) out = { time, path };
+      }
+    }
+  };
+  walk(dir);
   return out;
 }
 
 let stale = 0;
 let checked = 0;
 
-for (const { name, target } of linkedPackages()) {
+for (const { name, target, broken } of linkedPackages()) {
+  // A dangling link is the drift in its terminal form: nothing at all backs
+  // the bytes the resolver would serve. STALE, never "nothing to check".
+  if (broken) {
+    stale += 1;
+    checked += 1;
+    console.log(
+      `  STALE  ${name}\n` +
+        `      broken link: ${target.replace(process.env.HOME ?? "", "~")} does not exist`
+    );
+    continue;
+  }
+
   const artifact = newestFile(join(target, "dist"), ARTIFACT_EXTENSIONS);
   const source = newestFile(join(target, "src"), SOURCE_EXTENSIONS);
 

@@ -23,11 +23,11 @@ import {
   useKeyhiveUpdates,
   useReRenderOnDocProgress,
   useSelfIdentity,
-} from "@automerge/keyhive-react";
+} from "@inkandswitch/onomancy-react";
 import {
   createKeyhiveDesignation,
   useOnomancyDirectory,
-} from "@automerge/keyhive-react/onomancy";
+} from "@inkandswitch/onomancy-react/onomancy";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import { onomancyRuntime } from "../onomancyRuntime";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
@@ -321,8 +321,8 @@ function AppShell({
       <div className="flex-1 flex flex-col bg-muted">
         <header className="p-6 border-b border-foreground/10 bg-muted flex justify-center relative">
           <h1 className="text-2xl font-semibold flex items-center text-foreground">
-            <img src={keyhiveLogo} alt="Keyhive logo" id="keyhive-logo" />
-            Keyhive Demo
+            <img src={keyhiveLogo} alt="Honeybee logo" id="keyhive-logo" />
+            Onomancy Demo
           </h1>
           <div className="absolute right-6 top-1/2 -translate-y-1/2">
             <button
@@ -448,7 +448,11 @@ function AppShell({
               log.error("Could not publish your profile:", error);
             });
             changePhonebook((doc) => {
-              const record = (doc[entry.id] ??= {});
+              // Assign then re-read: `??=` yields the plain object, not the
+              // proxy, so writes to it would vanish without error.
+              if (!doc[entry.id]) doc[entry.id] = {};
+              const record = doc[entry.id];
+              if (!record) return;
               (record as Record<string, unknown>).namestore = namestore.url;
             });
           }}

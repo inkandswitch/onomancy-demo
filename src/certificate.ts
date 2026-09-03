@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
 import { verifyCertificate } from "@inkandswitch/onomancy";
 import type { Verdict } from "@inkandswitch/onomancy";
-import type { DnsDesignation } from "@automerge/keyhive-react/onomancy";
+import type { DnsDesignation } from "@inkandswitch/onomancy-react/onomancy";
 import {
   CERTIFICATES_KEY,
   RESERVED_ONOMANCY_KEY,
@@ -23,27 +23,15 @@ import { documentUrlFromHex } from "./onomancy";
 import { log } from "./log";
 
 /**
- * What a document's certificates say about a hostname's claim on it.
- *
- * Split by remedy, the same discipline the DNS status vocabulary uses. The
- * distinction that matters most is between the last two: `absent` is the
- * document making no claim, while `rejected` is evidence that arrived and
- * failed. Rendering those the same way would present a possible attack as a
- * missing feature.
+ * The verdict vocabulary and `isMutual` live in certificateVerdict.ts — the
+ * pure-core split — so they can be unit-tested without this module's Wasm
+ * value-imports. Re-exported here so consumers keep one import site.
  */
-export type CertificateVerdict =
-  | {
-      status: "accepted";
-      /** `on-path` proves the TXT generation key vouched for the signer. */
-      generation: "on-path" | "provisional" | null;
-      freshness: string;
-      /** Decimal: the serial space is u64, which `number` cannot hold. */
-      serial: string;
-    }
-  /** The document carries no certificate for this hostname. Not a failure. */
-  | { status: "absent" }
-  /** Evidence arrived and failed. A security signal. */
-  | { status: "rejected"; reason: string };
+import { isMutual } from "./certificateVerdict";
+import type { CertificateVerdict } from "./certificateVerdict";
+
+export { isMutual };
+export type { CertificateVerdict };
 
 /**
  * Refusals that mean "this certificate is about something else" rather than
@@ -79,38 +67,6 @@ function refusalReason(error: unknown): string {
     return String((error as { reason: unknown }).reason);
   }
   return "decode";
-}
-
-/**
- * Whether a verdict is strong enough to call the binding mutual.
- *
- * **Strictness rises with freshness, which is the opposite of the intuition.**
- * A fresh chain is authoritative enough to convict, so a fresh chain whose
- * generation key is off-path is refused outright by the verifier and never
- * reaches here. A stale chain carrying the same condition grades
- * `provisional` instead, because stale evidence is unrefreshed rather than
- * authoritative — it is not proof of wrongdoing.
- *
- * Written as a table rather than a condition on purpose. `if (fresh) accept`
- * reads perfectly naturally and is backwards, and a conditional invites
- * exactly that shape.
- */
-export function isMutual(verdict: CertificateVerdict): boolean {
-  if (verdict.status !== "accepted") return false;
-  switch (verdict.generation) {
-    // The generation key vouched for the signer: the strongest statement the
-    // format makes.
-    case "on-path":
-      return true;
-    // Off-path under a stale chain. The verifier declined to convict on
-    // unrefreshed evidence, and so do we: not proven, not disproven.
-    case "provisional":
-      return false;
-    // No generation claim to check. Absent is not a failed check, but it is
-    // also not a passed one.
-    default:
-      return false;
-  }
 }
 
 /**

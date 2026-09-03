@@ -10,7 +10,7 @@ import {
   AccessEditor,
   useDirectory,
   useTargetMembers,
-} from "@automerge/keyhive-react";
+} from "@inkandswitch/onomancy-react";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import linkAvatarImg from "../assets/link-avatar.png";

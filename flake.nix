@@ -1,5 +1,5 @@
 {
-  description = "keyhive-todo-app-demo";
+  description = "onomancy-demo";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-26.05";
@@ -112,6 +112,12 @@
             pnpm exec tsc -p tsconfig.json
           '';
 
+          # vitest.config.ts is separate from vite.config.ts precisely so this
+          # needs no .env / PHONEBOOK_DOC_ID.
+          ci-test = mkCheck "ci-test" ''
+            pnpm run test
+          '';
+
           # Mirrors the build step of .github/workflows/deploy.yml, which reads
           # PHONEBOOK_DOC_ID from a repository variable. A throwaway id is fine
           # here: nothing connects to the phonebook, we only want the bundle to
@@ -195,14 +201,14 @@
               exec nix run .#sync-server -- "$@"
             '';
 
-            "ci" = cmd "Run all CI checks (lint, tsc, build)" ''
+            "ci" = cmd "Run all CI checks (lint, test, tsc, build)" ''
               exec ${ci-all}/bin/keyhive-todo-ci
             '';
           })
         ];
       in {
         devShells.default = pkgs.mkShell {
-          name = "keyhive-todo-app-demo_shell";
+          name = "onomancy-demo_shell";
 
           nativeBuildInputs =
             command_menu

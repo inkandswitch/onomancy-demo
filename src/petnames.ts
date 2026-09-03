@@ -18,7 +18,10 @@
 // and authoritative, the second is an assertion others must be able to reach.
 
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
-import type { DirectoryEntry, NameDirectory } from "@automerge/keyhive-react";
+import type {
+  DirectoryEntry,
+  NameDirectory,
+} from "@inkandswitch/onomancy-react";
 import { useEffect, useMemo, useState } from "react";
 import { log } from "./log";
 import type { NamestoreDoc } from "./namestore";
@@ -86,6 +89,10 @@ export function usePetnames(
       return;
     }
     let cancelled = false;
+    // Held where the effect's cleanup can reach it. Returning the
+    // unsubscriber from the async IIFE hands it to nobody, so every rerun
+    // (StrictMode, url change) would stack another listener on the handle.
+    let unsubscribe: (() => void) | undefined;
 
     void (async () => {
       try {
@@ -94,8 +101,9 @@ export function usePetnames(
           if (!cancelled) setMap({ ...(handle.doc()?.[PETNAMES_KEY] ?? {}) });
         };
         read();
+        if (cancelled) return;
         handle.on("change", read);
-        return () => handle.off("change", read);
+        unsubscribe = () => handle.off("change", read);
       } catch (error) {
         log.debug("petnames: could not read the namestore:", error);
       }
@@ -103,6 +111,7 @@ export function usePetnames(
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
   }, [repo, namestoreUrl]);
 

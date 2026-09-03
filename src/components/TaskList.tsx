@@ -12,7 +12,7 @@ import {
   docIdFromAutomergeUrl,
   isUnprotectedDoc,
 } from "@automerge/automerge-repo-keyhive";
-import { useReRenderOnDocProgress } from "@automerge/keyhive-react";
+import { useReRenderOnDocProgress } from "@inkandswitch/onomancy-react";
 import { TaskList as TaskListDoc } from "../taskListDoc";
 import { copyToClipboard } from "../clipboard";
 import { log } from "../log";
@@ -85,7 +85,7 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
   // not land in `access === undefined` and print a flat denial, which is a
   // claim the app has not earned.
   const [checkFailed, setCheckFailed] = useState(false);
-  // Keyhive has no state for this document at all 2014 a different thing from
+  // Keyhive has no state for this document at all — a different thing from
   // being denied, and the only one of the two with no remedy.
   const [unknownToKeyhive, setUnknownToKeyhive] = useState(false);
   // A document we may read but have not received leaves `useDocument`
@@ -120,8 +120,8 @@ export const TaskList = ({ docUrl, hive, keyhiveVersion }: TaskListProps) => {
 
     async function fetchAccess() {
       try {
-        // Direct, public and through-a-group access all count. See
-        // `effectiveAccess`: no single keyhive call covers all three.
+        // Direct, public and through-a-group access all count; see the
+        // measurement note on `effectiveAccess`.
         const best = await effectiveAccess(hive, docUrl);
         // Whether keyhive has any state for this document at all.
         //

@@ -1,14 +1,25 @@
-# Keyhive TODO Demo
+# Onomancy Demo
 
-A small React app that shows how to build a collaborative, access-controlled app
-with [automerge-repo](https://github.com/automerge/automerge-repo) and
+A small React app that shows how to name, share and verify collaborative
+documents with [onomancy](https://github.com/inkandswitch/onomancy) —
+DNS-anchored, self-certifying names — on top of an end-to-end encrypted,
+access-controlled substrate built from
+[automerge-repo](https://github.com/automerge/automerge-repo) and
 [keyhive](https://github.com/inkandswitch/keyhive), wired together by
 [automerge-repo-keyhive](https://github.com/inkandswitch/automerge-repo-keyhive)
-(ARK).
+(ARK), with UI components from
+[onomancy-react](https://github.com/inkandswitch/onomancy-react).
 
-Each TODO list is an end-to-end encrypted Automerge document. The demo
-demonstrates:
+It began as a fork of the keyhive TODO demo, and the TODO list is still the
+document being named: each list is an end-to-end encrypted Automerge document.
+The demo demonstrates:
 
+- Naming documents with onomancy, so a list can be opened as
+  `~/todos/groceries` or `@example.com/todos` instead of by document id.
+- DNS-published names: a TXT record signed by DNSSEC lets anyone resolve
+  `@your-domain/...`, verified locally from the IANA root key.
+- DNS-verified identity badges, and certificates binding a document back to a
+  hostname.
 - Creating and editing documents that sync through a subduction sync server.
 - Sharing a document with another identity at a chosen access level (relay,
   read, edit, admin) via its contact card.
@@ -16,9 +27,6 @@ demonstrates:
 - Making a document public so anyone can read or edit it.
 - Revoking access, and access-gated UI (read-only view, hidden share button)
   driven by keyhive membership.
-- Naming documents with [onomancy](https://github.com/inkandswitch/onomancy),
-  so a list can be opened as `~/todos/groceries` or `@example.com/todos`
-  instead of by document id.
 
 ## Run
 
@@ -305,20 +313,13 @@ unverified. Never wrongly verifying, while sometimes wrongly failing to verify,
 is the right trade for a naming system. Saying so is more useful than implying
 the checks are exact.
 
-The known case: designation consults the bound document's own delegations, and
-those do not change when a group that already has access gains a member. So an
-identity holding admin on a namestore _through a group_ rather than directly
-reads `unsynced` — the copy for "cannot check yet" — about a document that is
-plainly present. This demo supports nested groups, so the case is reachable
-here.
-
-The verdict is honest; the wording is not. Fixing the wording is possible
-today. Fixing the _verdict_ is not: the only available evidence about indirect
-access is the set of individuals holding decryption keys for the document,
-which carries no access level at all. That could support an honest "holds keys
-to this document, by some route, at an unknown level" — never a checkmark.
-Verifying a nested-group admin needs transitive delegations _with_
-capabilities, which no current API exposes.
+The known case — an identity holding admin on a namestore _through a group_
+rather than directly reading as unverifiable — is fixed: designation now walks
+transitive delegations with their access levels, so a group-mediated admin
+verifies and a held document that reaches the identity by no path at all is
+positive evidence of non-membership. What remains is the honest residue:
+`unsynced` still means the document is not here to ask, and no verdict is
+formed without it.
 
 ## Build
 

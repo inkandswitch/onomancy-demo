@@ -20,8 +20,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { AutomergeUrl, Repo } from "@automerge/react/slim";
 import { isValidAutomergeUrl } from "@automerge/react/slim";
 import type { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
-import { documentDelegatesTo } from "@automerge/keyhive-react";
-import type { DirectoryEntry, NameDirectory } from "@automerge/keyhive-react";
+import { documentDelegatesTo } from "@inkandswitch/onomancy-react";
+import type {
+  DirectoryEntry,
+  NameDirectory,
+} from "@inkandswitch/onomancy-react";
 import { keyhiveRuntime } from "./keyhiveRuntime";
 import { log } from "./log";
 import type { NamestoreDoc } from "./namestore";
@@ -41,6 +44,12 @@ export interface SelfProfile {
 }
 
 type ProfileDoc = NamestoreDoc & { [PROFILE_KEY]?: SelfProfile };
+
+/**
+ * How long a pointed-at profile document may stay unreceived before the
+ * verdict is `unknown`. Matches the namestore walk's hop timeout.
+ */
+const PROFILE_TIMEOUT_MS = 10_000;
 
 function bareId(id: string): string {
   return (id.startsWith("0x") ? id.slice(2) : id).toLowerCase();
@@ -103,12 +112,29 @@ export async function verifyProfile(
   if (!isValidAutomergeUrl(namestoreUrl)) return { status: "unknown" };
 
   let profile: SelfProfile | undefined;
+  // Bounded like `edgesOf`, and for a sharper reason: the pointer is
+  // attacker-writable (the phonebook has no access control), and `repo.find`
+  // waits indefinitely for a permitted-but-unreceived document. One planted
+  // pointer at such a document would otherwise hang this call — and with it
+  // every verification queued behind it — forever, with no error anywhere.
+  const abort = new AbortController();
+  const giveUp = setTimeout(
+    () => abort.abort(new Error("profile document timed out")),
+    PROFILE_TIMEOUT_MS
+  );
   try {
-    const handle = await repo.find<ProfileDoc>(namestoreUrl as AutomergeUrl);
+    // The signal cancels the wait, not the load: a replica arriving later is
+    // kept, so the next verification pass can succeed.
+    const handle = await repo.find<ProfileDoc>(namestoreUrl as AutomergeUrl, {
+      signal: abort.signal,
+    });
     profile = handle.doc()?.[PROFILE_KEY];
   } catch {
-    // Not replicated here. Says nothing about the claim.
+    // Not replicated here (or not in the time allowed). Says nothing about
+    // the claim.
     return { status: "unknown" };
+  } finally {
+    clearTimeout(giveUp);
   }
   if (!profile) return { status: "unknown" };
 
@@ -172,10 +198,24 @@ export function useVerifiedProfiles(
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // In parallel, so one slow (or adversarial — the pointers are
+      // attacker-writable) document cannot gate the verdicts for everyone
+      // queued behind it. `verifyProfile` never rejects, but `allSettled`
+      // keeps one surprise from discarding the rest anyway.
+      const entries = Object.entries(pointers);
+      const settled = await Promise.allSettled(
+        entries.map(([id, namestore]) =>
+          verifyProfile(repo, hive, id, namestore)
+        )
+      );
       const next: Record<string, ProfileVerdict> = {};
-      for (const [id, namestore] of Object.entries(pointers)) {
-        next[bareId(id)] = await verifyProfile(repo, hive, id, namestore);
-      }
+      entries.forEach(([id], i) => {
+        const outcome = settled[i];
+        next[bareId(id)] =
+          outcome.status === "fulfilled"
+            ? outcome.value
+            : { status: "unknown" };
+      });
       if (!cancelled) setVerdicts(next);
     })();
     return () => {

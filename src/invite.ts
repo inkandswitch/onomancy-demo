@@ -44,7 +44,7 @@ import {
 // identity, so it needs the full entry the same way main.tsx does.
 // eslint-disable-next-line automerge-slimport/enforce-automerge-slim-import
 import { Repo } from "@automerge/automerge-repo";
-import { shortId } from "@automerge/keyhive-react";
+import { shortId } from "@inkandswitch/onomancy-react";
 import * as syncServer from "./syncServer";
 import { log } from "./log";
 

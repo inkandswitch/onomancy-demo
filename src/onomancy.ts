@@ -14,18 +14,19 @@
 // job, and our substrate is automerge-repo under keyhive.
 
 import {
+  isValidAutomergeUrl,
   stringifyAutomergeUrl,
   type AutomergeUrl,
   type BinaryDocumentId,
 } from "@automerge/react/slim";
-import { Name, resolveHostname, setup } from "@inkandswitch/onomancy";
+import {
+  classifyRecords,
+  encodeRecord,
+  Name,
+  resolveHostname,
+  setup,
+} from "@inkandswitch/onomancy";
 import { log } from "./log";
-import { parseBindingRecord, selectBinding } from "./record";
-
-// The wire format is re-exported so callers have one import for "onomancy
-// things", even though its definition is kept dependency-free next door.
-export { bindingRecord, parseBindingRecord } from "./record";
-export type { BindingRecord } from "./record";
 
 /** Panic reporting in the browser console. Safe to call more than once. */
 let didSetup = false;
@@ -149,25 +150,73 @@ export async function resolveBoundDocuments(
     );
   }
 
-  const binding = selectBinding(records);
-  switch (binding.status) {
-    case "unbound":
-      return [];
+  // The canonical RRset rule: strict parse, deferral before selection,
+  // highest serial wins, ties contested rather than picked. One instant,
+  // one record set — the ratchet and lineage stay the verifier's job.
+  const classified = classifyRecords(records);
 
-    case "contested":
-      // Two live claims at the newest generation. Returning either would make
-      // an arbitrary choice invisible to the caller, so return neither and say
-      // why: a contested name is misconfigured, not unclaimed.
-      log.error(
-        `onomancy: ${hostname} publishes ${binding.documents.length} different documents at generation ${binding.generation}; refusing to choose between them`
-      );
-      return [];
-
-    case "bound": {
-      const url = urlFromDocumentId(binding.record.documentId);
-      return url ? [url] : [];
-    }
+  if (classified.contested) {
+    // Live claims tied at the newest serial. Returning any would make an
+    // arbitrary choice invisible to the caller, so return none and say why:
+    // a contested name is misconfigured, not unclaimed. A contest can also
+    // be one document under two generation keys — a rotation tie — where
+    // the dispute is over who speaks for the name next, not where it points.
+    const serial = classified.contested[0]?.serial;
+    const documents = new Set(
+      classified.contested.map((claim) => claim.document)
+    ).size;
+    log.error(
+      documents > 1
+        ? `onomancy: ${hostname} publishes ${documents} different documents at serial ${serial}; refusing to choose between them`
+        : `onomancy: ${hostname} publishes one document under different generation keys at serial ${serial} (a rotation tie); refusing to choose between the keys`
+    );
+    return [];
   }
+
+  if (!classified.selected) {
+    if (classified.deferred > 0) {
+      // Set aside, not absent: a serial past the skew bound is a broken
+      // publisher clock or a planted value, and either way "publishes
+      // nothing" would be the wrong report. Nothing usable YET.
+      log.warn(
+        `onomancy: ${hostname} published ${classified.deferred} record(s) ` +
+          `with serials beyond the skew bound; deferred rather than selected`
+      );
+    }
+    return [];
+  }
+
+  // The candidate's document is already an `automerge:` anchor; the check
+  // turns the trusted-boundary string into a typed url without a cast.
+  const url = classified.selected.document;
+  return isValidAutomergeUrl(url) ? [url] : [];
+}
+
+/**
+ * The record a domain publishes at `_onomancy.<domain>`.
+ *
+ * A byte-level convenience over onomancy's `encodeRecord`, whose output the
+ * canonical parser accepts by construction: writer and reader are one
+ * definition, in one place. Pass a serial from the shared publisher rule
+ * (`nextSerial`) rather than a bare `Date.now()`, so republishing cannot tie
+ * with or lose to its own predecessor.
+ */
+export function bindingRecord(
+  generationKey: Uint8Array,
+  documentId: Uint8Array,
+  serial: bigint
+): string {
+  const url = urlFromDocumentId(documentId);
+  if (!url) {
+    throw new RangeError("document id is not a 32-byte document id");
+  }
+  return encodeRecord(serial.toString(), bytesToBase64(generationKey), url);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 function recordsOf(outcome: unknown): string[] {
@@ -206,19 +255,6 @@ function freshnessOf(outcome: unknown): string | undefined {
 }
 
 /**
- * The root document one TXT record binds, or `undefined` when the record is
- * not a well-formed `v=ONO0` record.
- *
- * Parsing is strict within the known tag, per the DNS anchoring spec: exact
- * field order and known fields only. An unparseable record is absent rather
- * than an error, so one malformed record cannot deny the others.
- */
-export function boundDocumentOf(record: string): AutomergeUrl | undefined {
-  const parsed = parseBindingRecord(record);
-  return parsed ? urlFromDocumentId(parsed.documentId) : undefined;
-}
-
-/**
  * A bound document id, as `HostnameBinding.ids` reports it, as a url.
  *
  * The runtime hands back hex — a document id is an ed25519 verifying key, and
@@ -238,10 +274,10 @@ export function documentUrlFromHex(hex: string): AutomergeUrl | undefined {
 
 function urlFromDocumentId(documentId: Uint8Array): AutomergeUrl | undefined {
   try {
-    // BinaryDocumentId is a branded Uint8Array, and the brand is exactly the
-    // 32-byte check parseBindingRecord already made. Asserting it here is what
-    // turns checked bytes into a document id, so this is where the cast
-    // belongs.
+    // BinaryDocumentId is a branded Uint8Array whose brand is the 32-byte
+    // check `stringifyAutomergeUrl` is about to make (it throws otherwise).
+    // Asserting it here is what turns checked bytes into a document id, so
+    // this is where the cast belongs.
     return stringifyAutomergeUrl(documentId as BinaryDocumentId);
   } catch {
     return undefined;

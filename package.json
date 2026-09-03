@@ -1,5 +1,5 @@
 {
-  "name": "keyhive-demo",
+  "name": "onomancy-demo",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -25,9 +25,9 @@
     "@automerge/automerge-repo-keyhive": "catalog:",
     "@automerge/automerge-repo-storage-indexeddb": "catalog:",
     "@automerge/automerge-subduction": "catalog:",
-    "@automerge/keyhive-react": "catalog:",
     "@automerge/react": "catalog:",
-    "@inkandswitch/onomancy": "catalog:",
+    "@inkandswitch/onomancy": "link:../onomancy/onomancy_wasm",
+    "@inkandswitch/onomancy-react": "catalog:",
     "@keyhive/keyhive": "catalog:",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AutomergeUrl, useRepo } from "@automerge/react/slim";
-import { Modal } from "@automerge/keyhive-react";
+import { Modal } from "@inkandswitch/onomancy-react";
 import { bindEdge } from "../namestore";
 import { rootOf } from "../names";
 import { parseName } from "../onomancy";

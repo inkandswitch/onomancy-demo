@@ -9,7 +9,7 @@ import {
   AccessEditor,
   CopyableField,
   createDocumentTarget,
-} from "@automerge/keyhive-react";
+} from "@inkandswitch/onomancy-react";
 import { keyhiveRuntime } from "../keyhiveRuntime";
 import { bindingRecord } from "../onomancy";
 import { serialForBody } from "../namestore";
@@ -105,6 +105,18 @@ export function NamestorePanel({
             Who can read your names. A name resolves only for someone who can
             read this document, so a published DNS record without readers here
             resolves for nobody but you. Adding an admin hands them the name.
+          </p>
+
+          {/*
+           * Keyhive read grants are per-document, and this document also
+           * holds the petname map and self-profile (ADR-028). The disclosure
+           * matters most for petnames, which the rest of the UI frames as
+           * private: a public-read grant here publishes them.
+           */}
+          <p className="text-xs text-muted-foreground mb-3">
+            Readers see the whole document — your names, but also your petnames
+            for other people and your profile. Making it public publishes all
+            three.
           </p>
 
           {/*

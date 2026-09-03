@@ -14,7 +14,7 @@ import {
   interpretAsDocumentId,
   isValidAutomergeUrl,
 } from "@automerge/react";
-import type { DirectoryDoc } from "@automerge/keyhive-react";
+import type { DirectoryDoc } from "@inkandswitch/onomancy-react";
 
 // Maps hex-encoded keyhive id to that peer's name and avatar.
 export type Phonebook = DirectoryDoc;

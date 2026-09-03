@@ -12,7 +12,7 @@ import {
   ProfileEditor,
   shortId,
   useDirectoryEntry,
-} from "@automerge/keyhive-react";
+} from "@inkandswitch/onomancy-react";
 import blankAvatarImg from "../assets/blankavatar.jpeg";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "../useContextMenu";

@@ -9,7 +9,7 @@ import { initTaskList, TaskList } from "../taskListDoc";
 import { RootDocument } from "../rootDoc";
 import { useState, useEffect } from "react";
 import { AutomergeRepoKeyhive } from "@automerge/automerge-repo-keyhive";
-import { useReRenderOnDocProgress } from "@automerge/keyhive-react";
+import { useReRenderOnDocProgress } from "@inkandswitch/onomancy-react";
 import { ContextMenu } from "./ContextMenu";
 import { NameModal } from "./NameModal";
 import { useContextMenu } from "../useContextMenu";

@@ -145,7 +145,7 @@ export default defineConfig(({ mode }) => {
           process.cwd(),
           ...packageRoots([
             "@inkandswitch/onomancy",
-            "@automerge/keyhive-react",
+            "@inkandswitch/onomancy-react",
           ]),
         ],
       },

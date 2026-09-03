@@ -24,29 +24,16 @@ import {
   encodeCertificate,
   resolveHostname,
   signableBytes,
+  type Signing,
 } from "@inkandswitch/onomancy";
 import { carriageFor } from "./carriage";
 import { log } from "./log";
 
-/**
- * Produce a detached signature over exactly `bytes`.
- *
- * A function rather than a key, so the caller decides custody. Nothing here
- * needs the key material — `crypto.subtle.sign` accepts a non-extractable
- * `CryptoKey` handle — which leaves room for a hardware token or passkey, and
- * keeps working if ARK stops persisting the identity key in exportable form.
- *
- * The signature must cover `bytes` **verbatim**. A signer that frames or
- * hashes its input first produces a certificate that assembles and verifies
- * nowhere.
- */
-export type SignBytes = (bytes: Uint8Array) => Promise<Uint8Array>;
-
-export interface Signing {
-  /** The verifying key the certificate will name as its signer. */
-  verifyingKey: Uint8Array;
-  sign: SignBytes;
-}
+// The signer contract is the package's own: a `SignBytes` covers its input
+// verbatim (a framing signer produces a certificate that verifies nowhere),
+// and a `Signing` names the verifying key the certificate will carry.
+// Re-exported so existing callers keep one import site.
+export type { SignBytes, Signing } from "@inkandswitch/onomancy";
 
 /**
  * Sign as this identity, using the keypair ARK holds for it.
