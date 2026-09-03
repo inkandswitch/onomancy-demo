@@ -49,6 +49,17 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # The real gates, before the bundle: `vite build` strips types without
+      # checking them, so a green build alone proves bundling, not correctness.
+      # Neither step needs PHONEBOOK_DOC_ID — vitest.config.ts is deliberately
+      # separate from vite.config.ts so tests run without a .env, and tsc
+      # reads only tsconfig.json.
+      - name: Lint
+        run: pnpm lint
+      - name: Test
+        run: pnpm test
+      - name: Typecheck
+        run: pnpm typecheck
       - name: Check PHONEBOOK_DOC_ID is configured
         if: vars.PHONEBOOK_DOC_ID == ''
         run: |
